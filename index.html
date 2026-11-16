@@ -1,0 +1,2994 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>UrbanFlex Cartagena — Movilidad Modular Inteligente</title>
+  <meta name="description" content="Aplicación móvil interactiva de movilidad inteligente y telemetría IoT para el sistema de buses modulares UrbanFlex en Cartagena, Colombia." />
+  <meta property="og:title" content="UrbanFlex Cartagena" />
+  <meta property="og:description" content="Sistema de transporte masivo inteligente en Cartagena con buses modulares adaptativos e infraestructura IoT." />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-canvas: #F4F4F0;
+      --surface-card: #FFFFFF;
+      --surface-muted: #EAEAE4;
+      --ink: #111315;
+      --ink-secondary: #484C52;
+      --accent-lime: #B8FF00;
+      --accent-orange: #FF4D00;
+      --accent-orange-tint: #FFE9DF;
+      --accent-cobalt: #0047FF;
+      --accent-cobalt-tint: #E6EDFF;
+      --border: 1.5px solid #111315;
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --font-display: 'Syne', sans-serif;
+      --font-body: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      --ease-kinetic: cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      height: 100%;
+      width: 100%;
+      font-family: var(--font-body);
+      color: var(--ink);
+      background-color: #DCDCD4;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    #outerGridCanvas {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 0;
+      pointer-events: none;
+      display: block;
+    }
+
+    /* Desktop stage centering */
+    .viewport-stage {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    /* High-precision mobile chassis */
+    .device-shell {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      max-width: 430px;
+      height: min(880px, calc(100dvh - 32px));
+      background-color: var(--bg-canvas);
+      background-image:
+        linear-gradient(to right, rgba(17, 19, 21, 0.045) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(17, 19, 21, 0.045) 1px, transparent 1px);
+      background-size: 18px 18px;
+      border: 2px solid var(--ink);
+      border-radius: 28px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 8px 8px 0 rgba(17, 19, 21, 0.16);
+    }
+
+    @media (max-width: 480px) {
+      .viewport-stage {
+        padding: 0;
+      }
+      .device-shell {
+        max-width: 100%;
+        height: 100dvh;
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+      }
+    }
+
+    /* Typography Utilities */
+    .font-display { font-family: var(--font-display); }
+    .font-mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+    .tabular { font-variant-numeric: tabular-nums; }
+
+    /* Focus rings */
+    button:focus-visible, select:focus-visible, input:focus-visible {
+      outline: 2px solid var(--accent-cobalt);
+      outline-offset: 2px;
+    }
+
+    /* Splash Screen — Minimal Kinetic Welcome */
+    .splash-screen {
+      position: absolute;
+      inset: 0;
+      z-index: 50;
+      background-color: var(--bg-canvas);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: stretch;
+      padding: 28px 20px 28px;
+      gap: 18px;
+      overflow: hidden;
+      transition: transform 0.5s var(--ease-kinetic), opacity 0.35s ease;
+    }
+
+    /* Moving saturated architectural grid synced with speed lines */
+    .splash-screen::before {
+      content: "";
+      position: absolute;
+      inset: -44px;
+      z-index: 0;
+      background-image:
+        linear-gradient(to right, rgba(0, 71, 255, 0.24) 1.5px, transparent 1.5px),
+        linear-gradient(to bottom, rgba(0, 71, 255, 0.24) 1.5px, transparent 1.5px);
+      background-size: 38px 38px;
+      animation: splashGridMove 0.78s linear infinite;
+      pointer-events: none;
+      will-change: transform;
+    }
+
+    @keyframes splashGridMove {
+      0% { transform: translate3d(0, 0, 0); }
+      100% { transform: translate3d(-38px, 0, 0); }
+    }
+
+    .splash-screen > * {
+      position: relative;
+      z-index: 1;
+    }
+
+    .splash-screen.is-hidden {
+      transform: translateY(-32px) scale(0.97);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .splash-brand-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      text-align: left;
+      gap: 2px;
+      padding-top: 2px;
+    }
+
+    .splash-hero-title {
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: clamp(3.3rem, 15.5vw, 4.15rem);
+      line-height: 0.86;
+      letter-spacing: -0.055em;
+      color: var(--ink);
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+    }
+
+    .splash-word-urban {
+      display: block;
+      animation: splashUrbanDrift 4.2s ease-in-out infinite;
+    }
+
+    .splash-word-flex {
+      display: inline-block;
+      background: var(--accent-lime);
+      color: var(--ink);
+      border: 2px solid var(--ink);
+      border-radius: 10px;
+      padding: 2px 12px 4px;
+      box-shadow: 4px 4px 0 var(--ink);
+      animation: splashFlexDrift 4.2s ease-in-out infinite;
+    }
+
+    @keyframes splashUrbanDrift {
+      0%, 100% { transform: translate3d(0, 0, 0); }
+      50% { transform: translate3d(5px, 0, 0); }
+    }
+
+    @keyframes splashFlexDrift {
+      0%, 100% { transform: translate3d(0, 0, 0); }
+      50% { transform: translate3d(-4px, 0, 0); }
+    }
+
+    .splash-media-frame {
+      position: relative;
+      flex: 1;
+      min-height: 240px;
+      margin: 0 -20px;
+      overflow: hidden;
+      background: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .splash-road-track {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 24px;
+      height: 18px;
+      border-top: 2px solid var(--ink);
+      border-bottom: 2px solid var(--ink);
+      background: rgba(244, 244, 240, 0.85);
+      overflow: hidden;
+      z-index: 1;
+    }
+
+    .splash-road-dashes {
+      position: absolute;
+      top: 6px;
+      left: 0;
+      width: 200%;
+      height: 3px;
+      background: repeating-linear-gradient(
+        to right,
+        var(--ink) 0px,
+        var(--ink) 26px,
+        transparent 26px,
+        transparent 52px
+      );
+      animation: splashRoadScroll 0.78s linear infinite;
+      will-change: transform;
+    }
+
+    @keyframes splashRoadScroll {
+      0% { transform: translate3d(0, 0, 0); }
+      100% { transform: translate3d(-52px, 0, 0); }
+    }
+
+    .splash-wind-lines {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+      overflow: hidden;
+    }
+
+    .splash-wind-streak {
+      position: absolute;
+      height: 3.5px;
+      border-radius: 2px;
+      animation: splashWindPass 1.4s linear infinite;
+      will-change: transform;
+    }
+
+    @keyframes splashWindPass {
+      0% { transform: translate3d(440px, 0, 0); opacity: 0; }
+      15% { opacity: 0.95; }
+      85% { opacity: 0.95; }
+      100% { transform: translate3d(-240px, 0, 0); opacity: 0; }
+    }
+
+    .splash-media-parallax {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 14px 28px;
+      transition: transform 0.22s var(--ease-kinetic);
+      will-change: transform;
+    }
+
+    .splash-media-img {
+      width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      display: block;
+      animation: splashBusDrive 2.4s ease-in-out infinite;
+      will-change: transform;
+    }
+
+    @keyframes splashBusDrive {
+      0%, 100% { transform: translate3d(-4px, 0px, 0) scale(1.03); }
+      25% { transform: translate3d(2px, -2.5px, 0) scale(1.035); }
+      50% { transform: translate3d(5px, 0px, 0) scale(1.03); }
+      75% { transform: translate3d(0px, -2px, 0) scale(1.035); }
+    }
+
+    .splash-media-fallback {
+      position: absolute;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 10px;
+      color: #FFFFFF;
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 20px;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .splash-media-frame.is-fallback .splash-media-img {
+      display: none;
+    }
+
+    .splash-media-frame.is-fallback .splash-media-fallback {
+      display: flex;
+    }
+
+    .splash-btn-arrow {
+      animation: splashArrowNudge 1.4s ease-in-out infinite;
+    }
+
+    @keyframes splashArrowNudge {
+      0%, 100% { transform: translateX(0); }
+      50% { transform: translateX(5px); }
+    }
+
+    .live-corridor-card {
+      background: var(--surface-muted);
+      border: var(--border);
+      border-radius: var(--radius-md);
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .live-indicator-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .telemetry-pulse {
+      width: 9px;
+      height: 9px;
+      border-radius: 2px;
+      background: var(--accent-lime);
+      border: 1.5px solid var(--ink);
+      flex-shrink: 0;
+      animation: telemetryBeat 1.8s infinite ease-in-out;
+    }
+
+    @keyframes telemetryBeat {
+      0%, 100% { transform: scale(1); background: var(--accent-lime); }
+      50% { transform: scale(1.22); background: var(--accent-cobalt); }
+    }
+
+    .btn-primary-kinetic {
+      width: 100%;
+      min-height: 52px;
+      background: var(--accent-lime);
+      color: var(--ink);
+      border: 1.5px solid var(--ink);
+      border-radius: var(--radius-md);
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 15px;
+      letter-spacing: 0.02em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      cursor: pointer;
+      box-shadow: 3px 3px 0 var(--ink);
+      transition: transform 0.14s var(--ease-kinetic), box-shadow 0.14s var(--ease-kinetic), background-color 0.15s ease;
+    }
+
+    .btn-primary-kinetic:hover {
+      background: #c5ff29;
+    }
+
+    .btn-primary-kinetic:active {
+      transform: translate(2px, 2px);
+      box-shadow: 1px 1px 0 var(--ink);
+    }
+
+    /* App Shell (Top Bar + Scrollable Viewport + Bottom Dock) */
+    .app-topbar {
+      height: 52px;
+      flex-shrink: 0;
+      background: var(--surface-card);
+      border-bottom: var(--border);
+      padding: 0 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      z-index: 20;
+    }
+
+    .brand-mark {
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 16px;
+      letter-spacing: -0.03em;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .brand-square {
+      width: 12px;
+      height: 12px;
+      background: var(--accent-lime);
+      border: 1.5px solid var(--ink);
+      display: inline-block;
+    }
+
+    .topbar-meta {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--ink-secondary);
+      white-space: nowrap;
+    }
+
+    .app-main {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 14px 14px 86px;
+      scroll-behavior: smooth;
+    }
+
+    .app-main::-webkit-scrollbar {
+      width: 4px;
+    }
+    .app-main::-webkit-scrollbar-thumb {
+      background: rgba(17, 19, 21, 0.25);
+      border-radius: 4px;
+    }
+
+    /* Tab Panels */
+    .tab-panel {
+      display: none;
+      animation: panelEnter 0.22s var(--ease-kinetic);
+    }
+    .tab-panel.is-active {
+      display: block;
+    }
+
+    @keyframes panelEnter {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Cards & Surfaces */
+    .tech-card {
+      background: var(--surface-card);
+      border: var(--border);
+      border-radius: var(--radius-md);
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+
+    .tech-card-muted {
+      background: var(--surface-muted);
+      border: var(--border);
+      border-radius: var(--radius-md);
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+
+    .section-header-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .section-title {
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 16px;
+      letter-spacing: -0.02em;
+    }
+
+    .section-caption {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--ink-secondary);
+      white-space: nowrap;
+    }
+
+    /* Route Search Form */
+    .route-planner {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .route-inputs-grid {
+      display: grid;
+      grid-template-columns: 1fr 44px;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .route-select-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .field-box {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-canvas);
+      border: var(--border);
+      border-radius: var(--radius-sm);
+      padding: 0 10px;
+      min-height: 44px;
+    }
+
+    .field-tag {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--ink-secondary);
+      width: 44px;
+      flex-shrink: 0;
+    }
+
+    .field-select {
+      width: 100%;
+      border: none;
+      background: transparent;
+      font-family: var(--font-body);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--ink);
+      min-height: 40px;
+      cursor: pointer;
+    }
+
+    .swap-btn {
+      width: 44px;
+      height: 94px;
+      border: var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface-muted);
+      color: var(--ink);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background-color 0.14s ease, transform 0.14s ease;
+    }
+
+    .swap-btn:hover { background: var(--accent-lime); }
+    .swap-btn:active { transform: scale(0.96); }
+
+    .quick-presets {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+      scrollbar-width: none;
+    }
+    .quick-presets::-webkit-scrollbar { display: none; }
+
+    .preset-btn {
+      min-height: 36px;
+      padding: 6px 10px;
+      border: var(--border);
+      border-radius: 6px;
+      background: var(--surface-card);
+      font-family: var(--font-body);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--ink);
+      white-space: nowrap;
+      flex-shrink: 0;
+      cursor: pointer;
+      transition: background-color 0.14s ease;
+    }
+
+    .preset-btn.is-active {
+      background: var(--ink);
+      color: #FFFFFF;
+    }
+
+    .route-summary-strip {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-top: 8px;
+      border-top: 1px dashed rgba(17, 19, 21, 0.25);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--ink-secondary);
+    }
+
+    /* Schematic Radar Map */
+    .radar-frame {
+      background: #FFFFFF;
+      border: var(--border);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+
+    .radar-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      border-bottom: var(--border);
+      background: var(--surface-muted);
+    }
+
+    .radar-legend {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-top: var(--border);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 600;
+      background: var(--bg-canvas);
+      justify-content: space-between;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+    }
+
+    .legend-bar {
+      display: inline-block;
+      height: 8px;
+      border: 1.5px solid var(--ink);
+      border-radius: 2px;
+    }
+
+    /* Bus List Cards */
+    .bus-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .bus-item-btn {
+      width: 100%;
+      text-align: left;
+      background: var(--surface-card);
+      border: var(--border);
+      border-radius: var(--radius-md);
+      padding: 12px 14px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: transform 0.14s var(--ease-kinetic), box-shadow 0.14s var(--ease-kinetic), background-color 0.15s ease;
+    }
+
+    .bus-item-btn:hover {
+      background: #FCFDF9;
+      box-shadow: 3px 3px 0 var(--ink);
+      transform: translate(-1px, -1px);
+    }
+
+    .bus-item-btn:active {
+      transform: translate(1px, 1px);
+      box-shadow: none;
+    }
+
+    .bus-item-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .bus-id-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .bus-code {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 13px;
+      background: var(--ink);
+      color: #FFFFFF;
+      padding: 3px 8px;
+      border-radius: 5px;
+    }
+
+    .bus-mode-tag {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 4px;
+      border: 1.5px solid var(--ink);
+    }
+
+    .mode-12 { background: var(--surface-muted); color: var(--ink); }
+    .mode-18 { background: var(--accent-cobalt); color: #FFFFFF; }
+    .mode-24 { background: var(--accent-lime); color: var(--ink); }
+    .mode-peak { background: var(--accent-orange); color: var(--ink); }
+
+    .bus-eta {
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 16px;
+      white-space: nowrap;
+    }
+
+    .bus-route-line {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--ink);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .bus-meta-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--ink-secondary);
+    }
+
+    .occupancy-track {
+      width: 100%;
+      height: 7px;
+      background: var(--surface-muted);
+      border: 1px solid var(--ink);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .occupancy-fill {
+      height: 100%;
+      transition: width 0.35s var(--ease-kinetic), background-color 0.2s ease;
+    }
+
+    /* Bus Detail Overlay View */
+    .detail-view {
+      position: absolute;
+      inset: 52px 0 58px 0;
+      z-index: 30;
+      background-color: var(--bg-canvas);
+      background-image:
+        linear-gradient(to right, rgba(17, 19, 21, 0.045) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(17, 19, 21, 0.045) 1px, transparent 1px);
+      background-size: 18px 18px;
+      overflow-y: auto;
+      padding: 12px 14px 24px;
+      transform: translateX(100%);
+      transition: transform 0.28s var(--ease-kinetic);
+    }
+
+    .detail-view.is-open {
+      transform: translateX(0);
+    }
+
+    .detail-back-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      gap: 8px;
+    }
+
+    .back-btn {
+      min-height: 44px;
+      padding: 0 12px;
+      background: var(--surface-card);
+      border: var(--border);
+      border-radius: var(--radius-sm);
+      font-family: var(--font-body);
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--ink);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+    .back-btn:hover { background: var(--surface-muted); }
+
+    /* Mechanical Mode Selector */
+    .mode-selector {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .mode-switch-btn {
+      min-height: 48px;
+      padding: 6px 4px;
+      background: var(--bg-canvas);
+      border: var(--border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      transition: transform 0.12s ease, background-color 0.15s ease;
+    }
+
+    .mode-switch-btn:active { transform: scale(0.97); }
+
+    .mode-switch-btn .m-title {
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 12px;
+      color: var(--ink);
+    }
+
+    .mode-switch-btn .m-sub {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--ink-secondary);
+    }
+
+    .mode-switch-btn.is-active[data-mode="12"] {
+      background: var(--surface-muted);
+      box-shadow: 2px 2px 0 var(--ink);
+    }
+    .mode-switch-btn.is-active[data-mode="18"] {
+      background: var(--accent-cobalt);
+      box-shadow: 2px 2px 0 var(--ink);
+    }
+    .mode-switch-btn.is-active[data-mode="18"] .m-title,
+    .mode-switch-btn.is-active[data-mode="18"] .m-sub {
+      color: #FFFFFF;
+    }
+    .mode-switch-btn.is-active[data-mode="24"] {
+      background: var(--accent-lime);
+      box-shadow: 2px 2px 0 var(--ink);
+    }
+
+    .sim-metrics-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .sim-kpi {
+      background: var(--bg-canvas);
+      border: 1.5px solid var(--ink);
+      border-radius: var(--radius-sm);
+      padding: 8px;
+    }
+
+    .sim-kpi-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--ink-secondary);
+    }
+
+    .sim-kpi-val {
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 16px;
+      margin-top: 2px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .boarding-callout {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border: var(--border);
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1.35;
+    }
+
+    .boarding-callout.is-optimal {
+      background: #F1FFD1;
+    }
+
+    .boarding-callout.is-alert {
+      background: var(--accent-orange-tint);
+    }
+
+    /* Telemetry Grid */
+    .telemetry-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    .telem-cell {
+      background: var(--bg-canvas);
+      border: 1.5px solid var(--ink);
+      border-radius: var(--radius-sm);
+      padding: 9px 10px;
+    }
+
+    .telem-key {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--ink-secondary);
+      margin-bottom: 3px;
+    }
+
+    .telem-val {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    /* Tab 2: QR Pass */
+    .pass-ticket {
+      background: var(--surface-card);
+      border: var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+
+    .pass-header {
+      background: var(--ink);
+      color: #FFFFFF;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .pass-body {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .qr-frame {
+      background: #FFFFFF;
+      border: 2px solid var(--ink);
+      border-radius: var(--radius-md);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .pass-divider {
+      width: 100%;
+      border-top: 1.5px dashed rgba(17, 19, 21, 0.35);
+      margin: 2px 0;
+    }
+
+    .balance-row {
+      width: 100%;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .balance-amount {
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 28px;
+      line-height: 1;
+      letter-spacing: -0.03em;
+    }
+
+    .topup-grid {
+      width: 100%;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .topup-btn {
+      min-height: 44px;
+      border: var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--bg-canvas);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--ink);
+      cursor: pointer;
+      transition: background-color 0.14s ease, transform 0.12s ease;
+    }
+
+    .topup-btn:hover { background: var(--accent-lime); }
+    .topup-btn:active { transform: scale(0.96); }
+
+    .secondary-btn {
+      width: 100%;
+      min-height: 44px;
+      border: var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface-muted);
+      font-family: var(--font-body);
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--ink);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+    .secondary-btn:hover { background: #deded6; }
+
+    /* Tab 3: Impacto IoT */
+    .regime-bar {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .regime-btn {
+      min-height: 42px;
+      border: var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface-card);
+      font-family: var(--font-body);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--ink);
+      cursor: pointer;
+    }
+    .regime-btn.is-active {
+      background: var(--ink);
+      color: #FFFFFF;
+    }
+
+    .kpi-grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .kpi-card {
+      background: var(--surface-card);
+      border: var(--border);
+      border-radius: var(--radius-md);
+      padding: 12px;
+    }
+
+    .kpi-val {
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 24px;
+      letter-spacing: -0.03em;
+      margin: 4px 0 2px;
+    }
+
+    .fleet-mix-bar {
+      height: 22px;
+      border: var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      display: flex;
+      margin: 8px 0;
+    }
+
+    .fleet-seg {
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      transition: width 0.35s var(--ease-kinetic);
+    }
+
+    /* Bottom Navigation Dock */
+    .bottom-dock {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 58px;
+      background: var(--surface-card);
+      border-top: var(--border);
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      z-index: 40;
+    }
+
+    .dock-tab {
+      border: none;
+      background: transparent;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      cursor: pointer;
+      color: var(--ink-secondary);
+      font-family: var(--font-body);
+      font-size: 11px;
+      font-weight: 600;
+      position: relative;
+      transition: color 0.14s ease, background-color 0.14s ease;
+    }
+
+    .dock-tab.is-active {
+      color: var(--ink);
+      font-weight: 700;
+      background: var(--accent-lime);
+    }
+
+    .dock-tab:not(:last-child) {
+      border-right: 1px solid rgba(17, 19, 21, 0.14);
+    }
+
+    /* Toast feedback */
+    .toast-banner {
+      position: absolute;
+      top: 60px;
+      left: 14px;
+      right: 14px;
+      z-index: 60;
+      background: var(--ink);
+      color: #FFFFFF;
+      border: 1.5px solid var(--accent-lime);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transform: translateY(-16px);
+      opacity: 0;
+      pointer-events: none;
+      transition: transform 0.22s var(--ease-kinetic), opacity 0.2s ease;
+    }
+
+    .toast-banner.is-visible {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    /* Mechanical SVG transitions */
+    .mech-part {
+      transition: transform 0.45s var(--ease-kinetic), opacity 0.3s ease;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="outerGridCanvas" aria-hidden="true"></canvas>
+  <div class="viewport-stage">
+    <div class="device-shell" id="deviceShell">
+
+      <!-- SCREEN A: SPLASH / BIENVENIDA CON URBAN + FLEX E ILUSTRACIÓN EN MOVIMIENTO -->
+      <section class="splash-screen" id="splashScreen" aria-label="Bienvenida UrbanFlex">
+        <div class="splash-brand-wrap">
+          <h1 class="splash-hero-title">
+            <span class="splash-word-urban">URBAN</span>
+            <span class="splash-word-flex">FLEX</span>
+          </h1>
+        </div>
+
+        <div class="splash-media-frame" id="splashMediaFrame">
+          <div class="splash-wind-lines" aria-hidden="true">
+            <span class="splash-wind-streak" style="top:20%; width:90px; background:var(--accent-cobalt); animation-delay:0s;"></span>
+            <span class="splash-wind-streak" style="top:34%; width:130px; background:var(--accent-lime); animation-delay:-0.5s;"></span>
+            <span class="splash-wind-streak" style="top:58%; width:75px; background:var(--ink); opacity:0.25; animation-delay:-0.9s;"></span>
+            <span class="splash-wind-streak" style="top:72%; width:110px; background:var(--accent-lime); animation-delay:-0.25s;"></span>
+          </div>
+
+          <div class="splash-media-parallax" id="splashMediaParallax">
+            <img
+              class="splash-media-img"
+              src="/src/assets/images/urbanflex_bus_cutout.png"
+              alt="Ilustración del bus modular UrbanFlex sin fondo en movimiento"
+              referrerPolicy="no-referrer"
+              onerror="document.getElementById('splashMediaFrame').classList.add('is-fallback')"
+            />
+          </div>
+
+          <div class="splash-road-track" aria-hidden="true">
+            <div class="splash-road-dashes"></div>
+          </div>
+
+          <div class="splash-media-fallback">
+            <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#B8FF00" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6v6"/><path d="M15 6v6"/><path d="M2 12h19.6"/><path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3"/><circle cx="7" cy="18" r="2"/><path d="M9 18h5"/><circle cx="16" cy="18" r="2"/></svg>
+            <span>URBANFLEX</span>
+          </div>
+        </div>
+
+        <button class="btn-primary-kinetic" id="startAppBtn" type="button">
+          <span>INICIAR</span>
+          <svg class="splash-btn-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </button>
+      </section>
+
+      <!-- TOP BAR -->
+      <header class="app-topbar">
+        <div class="brand-mark">
+          <span class="brand-square" aria-hidden="true"></span>
+          <span>URBANFLEX</span>
+        </div>
+        <div class="topbar-meta" id="liveClockMeta">CARTAGENA · --:--</div>
+      </header>
+
+      <!-- TOAST NOTIFICATION -->
+      <div class="toast-banner" id="toastBanner" role="status" aria-live="polite">
+        <span id="toastText"></span>
+      </div>
+
+      <!-- MAIN SCROLLABLE CONTENT -->
+      <main class="app-main" id="appMain">
+
+        <!-- TAB 1: EXPLORAR / RUTAS -->
+        <section class="tab-panel is-active" id="tabExplore" aria-label="Explorar rutas y radar en vivo">
+
+          <!-- Buscador Interactivo de Rutas -->
+          <div class="tech-card">
+            <div class="section-header-row">
+              <h2 class="section-title">Planificador Troncal</h2>
+              <span class="section-caption">CARTAGENA · T1</span>
+            </div>
+
+            <div class="route-planner">
+              <div class="route-inputs-grid">
+                <div class="route-select-stack">
+                  <label class="field-box">
+                    <span class="field-tag">ORIGEN</span>
+                    <select class="field-select" id="originSelect" aria-label="Estación de origen"></select>
+                  </label>
+                  <label class="field-box">
+                    <span class="field-tag">DESTINO</span>
+                    <select class="field-select" id="destSelect" aria-label="Estación de destino"></select>
+                  </label>
+                </div>
+                <button class="swap-btn" id="swapStationsBtn" type="button" aria-label="Invertir origen y destino" title="Invertir ruta">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg>
+                </button>
+              </div>
+
+              <div class="quick-presets" id="presetButtons">
+                <button class="preset-btn is-active" type="button" data-origin="" data-dest="">Todas (6)</button>
+                <button class="preset-btn" type="button" data-origin="prado" data-dest="bocagrande">Prado → Bocagrande</button>
+                <button class="preset-btn" type="button" data-origin="castellana" data-dest="bodeguita">Castellana → Centro</button>
+                <button class="preset-btn" type="button" data-origin="bazurto" data-dest="crespo">Bazurto → Crespo</button>
+              </div>
+
+              <div class="route-summary-strip" id="routeSummaryStrip">
+                <span>TODAS LAS UNIDADES ACTIVAS</span>
+                <span>6 EN CORREDOR</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mapa Radar Esquemático de Cartagena -->
+          <div class="radar-frame">
+            <div class="radar-toolbar">
+              <div style="display:flex; align-items:center; gap:7px;">
+                <span class="telemetry-pulse" aria-hidden="true"></span>
+                <span class="font-display" style="font-size:13px; font-weight:800;">Radar Av. Pedro de Heredia</span>
+              </div>
+              <span class="font-mono" style="font-size:10px; font-weight:700;" id="radarActiveCount">6 UNIDADES EN RUTA</span>
+            </div>
+
+            <svg id="radarSvg" viewBox="0 0 380 198" width="100%" height="198" aria-label="Mapa esquemático en vivo del corredor de Cartagena">
+              <!-- Subtle Bay of Cartagena coastline contour -->
+              <path d="M 0,152 Q 95,140 165,162 T 380,158 L 380,198 L 0,198 Z" fill="#EAEAE4" opacity="0.65" />
+              <text x="270" y="186" font-family="JetBrains Mono, monospace" font-size="8" fill="#484C52" opacity="0.7">BAHÍA DE CARTAGENA</text>
+
+              <!-- Secondary Crespo branch -->
+              <path d="M 244,76 L 310,36 L 348,36" fill="none" stroke="#111315" stroke-width="2" stroke-dasharray="4 3" opacity="0.55" />
+
+              <!-- Main Corridor Track: Portal El Prado -> Bocagrande -->
+              <path id="corridorBasePath" d="M 30,118 L 100,118 L 172,96 L 244,76 L 310,108 L 348,134" fill="none" stroke="#111315" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" />
+              <path id="corridorActiveHighlight" d="M 30,118 L 100,118 L 172,96 L 244,76 L 310,108 L 348,134" fill="none" stroke="#0047FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+
+              <!-- Interactive Stations Layer (rendered by JS) -->
+              <g id="radarStationsLayer"></g>
+
+              <!-- Live Moving Buses Layer (rendered by JS) -->
+              <g id="radarBusesLayer"></g>
+            </svg>
+
+            <div class="radar-legend">
+              <div class="legend-item">
+                <span class="legend-bar" style="width:12px; background:var(--surface-muted);"></span>
+                <span>12m Valle</span>
+              </div>
+              <div class="legend-item">
+                <span class="legend-bar" style="width:18px; background:var(--accent-cobalt);"></span>
+                <span>18m Flujo</span>
+              </div>
+              <div class="legend-item">
+                <span class="legend-bar" style="width:24px; background:var(--accent-lime);"></span>
+                <span>24m Pico</span>
+              </div>
+              <div class="legend-item">
+                <span class="legend-bar" style="width:24px; background:var(--accent-orange);"></span>
+                <span>Alta carga</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Lista de Buses Cercanos -->
+          <div class="section-header-row" style="margin-top:4px;">
+            <h2 class="section-title">Unidades Próximas</h2>
+            <span class="section-caption" id="nearestFilterCaption">HACIA BOCAGRANDE</span>
+          </div>
+          <div class="bus-list" id="busListContainer"></div>
+        </section>
+
+        <!-- TAB 2: MI PASE QR -->
+        <section class="tab-panel" id="tabPass" aria-label="Mi Pase QR y saldo">
+          <div class="pass-ticket">
+            <div class="pass-header">
+              <div>
+                <div class="font-mono" style="font-size:10px; opacity:0.75;">TARJETA DIGITAL URBANFLEX</div>
+                <div class="font-display" style="font-size:17px; font-weight:800; margin-top:2px;">Pasajero Frecuente</div>
+              </div>
+              <div class="font-mono" style="font-size:12px; font-weight:700; color:var(--accent-lime);">CTG-049281</div>
+            </div>
+
+            <div class="pass-body">
+              <div class="qr-frame">
+                <svg id="dynamicQrSvg" viewBox="0 0 120 120" width="152" height="152" aria-label="Código QR de acceso UrbanFlex"></svg>
+                <div style="display:flex; align-items:center; justify-content:space-between; width:100%; font-family:var(--font-mono); font-size:10px; font-weight:700;">
+                  <span id="qrTokenCode">UFX-KEY-8841</span>
+                  <span id="qrCountdown" style="color:var(--accent-cobalt);">EXPIRA EN 28S</span>
+                </div>
+              </div>
+
+              <div style="display:flex; gap:8px; width:100%;">
+                <button class="secondary-btn" id="refreshQrBtn" type="button" style="flex:1;">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+                  <span>Renovar QR</span>
+                </button>
+                <button class="btn-primary-kinetic" id="validateFareBtn" type="button" style="flex:1.25; min-height:44px; font-size:13px;">
+                  <span>Validar Viaje ($3.000)</span>
+                </button>
+              </div>
+
+              <div class="pass-divider"></div>
+
+              <div class="balance-row">
+                <div>
+                  <div class="font-mono" style="font-size:10px; color:var(--ink-secondary);">SALDO DISPONIBLE</div>
+                  <div class="balance-amount tabular" id="passBalanceText">$14.500</div>
+                </div>
+                <div style="text-align:right;">
+                  <div class="font-mono" style="font-size:10px; color:var(--ink-secondary);">TARIFA TRONCAL</div>
+                  <div class="font-mono" style="font-size:13px; font-weight:700;">$3.000 COP</div>
+                </div>
+              </div>
+
+              <div style="width:100%;">
+                <div class="font-mono" style="font-size:10px; color:var(--ink-secondary); margin-bottom:6px;">RECARGA RÁPIDA PSE / NEQUI</div>
+                <div class="topup-grid">
+                  <button class="topup-btn" type="button" data-amount="5000">+$5.000</button>
+                  <button class="topup-btn" type="button" data-amount="10000">+$10.000</button>
+                  <button class="topup-btn" type="button" data-amount="20000">+$20.000</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="tech-card" style="background:var(--accent-lime);">
+            <div class="section-header-row" style="margin-bottom:4px;">
+              <span class="font-mono" style="font-size:10px; font-weight:700;">HUELLA DE CARBONO PERSONAL</span>
+              <span class="font-mono" style="font-size:10px; font-weight:700;" id="userTripCountLabel">28 VIAJES</span>
+            </div>
+            <div style="display:flex; align-items:baseline; justify-content:space-between;">
+              <div class="font-display tabular" style="font-size:26px; font-weight:800;" id="userCo2Saved">42.8 kg CO₂</div>
+              <div style="font-size:12px; font-weight:700;">evitados este mes</div>
+            </div>
+            <p style="font-size:12px; margin-top:4px; font-weight:500;">
+              Equivalente a 192 km menos en vehículo particular por Av. Pedro de Heredia.
+            </p>
+          </div>
+
+          <div class="tech-card">
+            <div class="section-header-row">
+              <h3 class="section-title" style="font-size:14px;">Últimos Movimientos</h3>
+              <span class="section-caption">TIEMPO REAL</span>
+            </div>
+            <div id="passActivityList" style="display:flex; flex-direction:column; gap:8px;"></div>
+          </div>
+        </section>
+
+        <!-- TAB 3: IMPACTO IOT -->
+        <section class="tab-panel" id="tabImpact" aria-label="Dashboard de impacto IoT de Cartagena">
+          <div class="section-header-row">
+            <h2 class="section-title">Telemetría Urbana Cartagena</h2>
+            <span class="section-caption">RED TRONCAL</span>
+          </div>
+
+          <div class="regime-bar" role="group" aria-label="Simular franja horaria de la ciudad">
+            <button class="regime-btn is-active" type="button" data-regime="live">Flujo Actual</button>
+            <button class="regime-btn" type="button" data-regime="valle">Hora Valle</button>
+            <button class="regime-btn" type="button" data-regime="pico">Hora Pico</button>
+          </div>
+
+          <div class="kpi-grid-2">
+            <div class="kpi-card">
+              <div class="font-mono" style="font-size:10px; color:var(--ink-secondary);">BUSES RETRAÍDOS (12M)</div>
+              <div class="kpi-val tabular" id="kpiRetracted">5 / 14</div>
+              <div style="font-size:11px; font-weight:600; color:var(--ink-secondary);" id="kpiRetractedSub">Ahorro activo en valle</div>
+            </div>
+            <div class="kpi-card" style="background:var(--accent-lime);">
+              <div class="font-mono" style="font-size:10px;">EMISIONES EVITADAS HOY</div>
+              <div class="kpi-val tabular" id="kpiCo2City">1.84 Ton</div>
+              <div style="font-size:11px; font-weight:700;">CO₂ vs buses rígidos</div>
+            </div>
+            <div class="kpi-card">
+              <div class="font-mono" style="font-size:10px; color:var(--ink-secondary);">ESPERA PROMEDIO</div>
+              <div class="kpi-val tabular" id="kpiWaitTime">3.2 min</div>
+              <div style="font-size:11px; font-weight:600; color:var(--accent-cobalt);">Sincronía semafórica</div>
+            </div>
+            <div class="kpi-card">
+              <div class="font-mono" style="font-size:10px; color:var(--ink-secondary);">EFICIENCIA ENERGÉTICA</div>
+              <div class="kpi-val tabular" id="kpiEfficiency">+31.4%</div>
+              <div style="font-size:11px; font-weight:600; color:var(--ink-secondary);">Frenado regenerativo</div>
+            </div>
+          </div>
+
+          <!-- Fleet Configuration Distribution -->
+          <div class="tech-card">
+            <div class="section-header-row">
+              <h3 class="section-title" style="font-size:14px;">Distribución Elástica de Flota</h3>
+              <span class="section-caption">14 UNIDADES</span>
+            </div>
+            <div class="fleet-mix-bar" id="fleetMixBar">
+              <div class="fleet-seg" id="mixSeg12" style="width:36%; background:var(--surface-muted); color:var(--ink);">12m (5)</div>
+              <div class="fleet-seg" id="mixSeg18" style="width:36%; background:var(--accent-cobalt); color:#FFFFFF;">18m (5)</div>
+              <div class="fleet-seg" id="mixSeg24" style="width:28%; background:var(--accent-lime); color:var(--ink);">24m (4)</div>
+            </div>
+            <div class="font-mono" style="font-size:10px; color:var(--ink-secondary); display:flex; justify-content:space-between;">
+              <span>CAPACIDAD DESPLEGADA: <strong id="deployedCapText" style="color:var(--ink);">1.142 PAX</strong></span>
+              <span>OCUPACIÓN MEDIA: <strong id="avgOccText" style="color:var(--ink);">64%</strong></span>
+            </div>
+          </div>
+
+          <!-- Hourly Adaptive Chart -->
+          <div class="tech-card">
+            <div class="section-header-row">
+              <h3 class="section-title" style="font-size:14px;">Curva Demanda vs. Longitud</h3>
+              <span class="section-caption">05:00 — 22:00</span>
+            </div>
+            <svg id="cityDemandChart" viewBox="0 0 340 128" width="100%" height="128" aria-label="Gráfica de demanda horaria y expansión modular"></svg>
+            <div class="font-mono" style="font-size:10px; color:var(--ink-secondary); margin-top:6px; display:flex; justify-content:space-between;" id="chartSelectedReadout">
+              <span>TOCA UNA BARRA PARA INSPECCIONAR FRANJA</span>
+              <span style="color:var(--ink); font-weight:700;">18:00 · 24M</span>
+            </div>
+          </div>
+
+          <!-- Station Load Breakdown -->
+          <div class="tech-card">
+            <div class="section-header-row">
+              <h3 class="section-title" style="font-size:14px;">Carga en Estaciones Clave</h3>
+              <span class="section-caption">SENSORES DE ANDÉN</span>
+            </div>
+            <div id="stationLoadList" style="display:flex; flex-direction:column; gap:8px;"></div>
+          </div>
+        </section>
+      </main>
+
+      <!-- SCREEN C: VISTA DETALLADA DEL BUS SELECCIONADO -->
+      <aside class="detail-view" id="busDetailView" aria-label="Telemetría y simulador mecánico del bus">
+        <div class="detail-back-bar">
+          <button class="back-btn" id="closeDetailBtn" type="button">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+            <span>Volver al radar</span>
+          </button>
+          <span class="font-mono" style="font-size:12px; font-weight:700;" id="detailUnitBadge">UFX-104 · CTG-892</span>
+        </div>
+
+        <!-- 1. Simulador Mecánico Interactivo -->
+        <div class="tech-card">
+          <div class="section-header-row">
+            <h2 class="section-title">Simulador Mecánico</h2>
+            <span class="section-caption" id="simRailStatus">RIELES: SINCRONIZADO</span>
+          </div>
+
+          <!-- Interactive SVG Modular Diagram -->
+          <div style="background:var(--bg-canvas); border:1.5px solid var(--ink); border-radius:var(--radius-sm); padding:10px 8px 6px;">
+            <svg id="mechSimSvg" viewBox="0 0 340 104" width="100%" height="104" aria-label="Diagrama mecánico de expansión modular">
+              <!-- Rail Bed -->
+              <line x1="12" y1="84" x2="328" y2="84" stroke="#111315" stroke-width="2" />
+              <line x1="12" y1="89" x2="328" y2="89" stroke="#111315" stroke-width="1" stroke-dasharray="4 3" />
+              <!-- Dynamic Dimension Bracket -->
+              <g id="simDimBracket">
+                <line id="simDimLine" x1="20" y1="14" x2="306" y2="14" stroke="#0047FF" stroke-width="1.5" />
+                <line x1="20" y1="10" x2="20" y2="18" stroke="#0047FF" stroke-width="1.5" />
+                <line id="simDimEndTick" x1="306" y1="10" x2="306" y2="18" stroke="#0047FF" stroke-width="1.5" />
+                <rect x="132" y="5" width="62" height="16" rx="3" fill="#FFFFFF" stroke="#0047FF" stroke-width="1.2" />
+                <text id="simDimLabel" x="163" y="16" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="9.5" font-weight="700" fill="#0047FF">24.0 m</text>
+              </g>
+
+              <!-- Module C -->
+              <g id="simModC" class="mech-part" transform="translate(212, 0)">
+                <rect x="0" y="32" width="92" height="44" rx="5" fill="#FFFFFF" stroke="#111315" stroke-width="1.8" />
+                <rect x="8" y="39" width="32" height="15" rx="2" fill="#EAEAE4" stroke="#111315" stroke-width="1" />
+                <rect x="46" y="39" width="36" height="15" rx="2" fill="#EAEAE4" stroke="#111315" stroke-width="1" />
+                <rect x="0" y="64" width="92" height="5" fill="#B8FF00" />
+                <text x="8" y="61" font-family="JetBrains Mono, monospace" font-size="8" font-weight="700" fill="#111315">MÓDULO C</text>
+                <circle cx="24" cy="79" r="7" fill="#111315" /><circle cx="24" cy="79" r="2.5" fill="#EAEAE4" />
+                <circle cx="72" cy="79" r="7" fill="#111315" /><circle cx="72" cy="79" r="2.5" fill="#EAEAE4" />
+              </g>
+
+              <!-- Accordion 2 -->
+              <g id="simAcc2" class="mech-part" transform="translate(196, 0)">
+                <rect x="0" y="36" width="16" height="36" fill="#111315" />
+                <line x1="5" y1="36" x2="5" y2="72" stroke="#F4F4F0" stroke-width="1" />
+                <line x1="11" y1="36" x2="11" y2="72" stroke="#F4F4F0" stroke-width="1" />
+              </g>
+
+              <!-- Module B -->
+              <g id="simModB" class="mech-part" transform="translate(118, 0)">
+                <rect x="0" y="32" width="78" height="44" rx="4" fill="#FFFFFF" stroke="#111315" stroke-width="1.8" />
+                <rect x="8" y="39" width="28" height="15" rx="2" fill="#EAEAE4" stroke="#111315" stroke-width="1" />
+                <rect x="42" y="39" width="28" height="15" rx="2" fill="#EAEAE4" stroke="#111315" stroke-width="1" />
+                <rect x="0" y="64" width="78" height="5" fill="#0047FF" />
+                <text x="8" y="61" font-family="JetBrains Mono, monospace" font-size="8" font-weight="700" fill="#111315">MÓDULO B</text>
+                <circle cx="39" cy="79" r="7" fill="#111315" /><circle cx="39" cy="79" r="2.5" fill="#EAEAE4" />
+              </g>
+
+              <!-- Accordion 1 -->
+              <g id="simAcc1" class="mech-part" transform="translate(102, 0)">
+                <rect x="0" y="36" width="16" height="36" fill="#111315" />
+                <line x1="5" y1="36" x2="5" y2="72" stroke="#F4F4F0" stroke-width="1" />
+                <line x1="11" y1="36" x2="11" y2="72" stroke="#F4F4F0" stroke-width="1" />
+              </g>
+
+              <!-- Module A -->
+              <g id="simModA">
+                <path d="M20,38 C20,33 26,32 34,32 L102,32 L102,76 L20,76 Z" fill="#FFFFFF" stroke="#111315" stroke-width="1.8" />
+                <path d="M22,39 L40,39 L40,56 L20,56 Z" fill="#111315" />
+                <rect x="46" y="39" width="46" height="15" rx="2" fill="#EAEAE4" stroke="#111315" stroke-width="1" />
+                <rect x="20" y="64" width="82" height="5" fill="#B8FF00" />
+                <rect x="18" y="60" width="4" height="6" fill="#FF4D00" />
+                <text x="46" y="61" font-family="JetBrains Mono, monospace" font-size="8" font-weight="700" fill="#111315">MÓDULO A</text>
+                <circle cx="40" cy="79" r="7" fill="#111315" /><circle cx="40" cy="79" r="2.5" fill="#B8FF00" />
+                <circle cx="82" cy="79" r="7" fill="#111315" /><circle cx="82" cy="79" r="2.5" fill="#EAEAE4" />
+              </g>
+            </svg>
+          </div>
+
+          <div class="mode-selector" role="group" aria-label="Modo de longitud modular">
+            <button class="mode-switch-btn" type="button" data-mode="12">
+              <span class="m-title">Modo Valle</span>
+              <span class="m-sub">12m · 1 Mód</span>
+            </button>
+            <button class="mode-switch-btn" type="button" data-mode="18">
+              <span class="m-title">Modo Flujo</span>
+              <span class="m-sub">18m · 2 Mód</span>
+            </button>
+            <button class="mode-switch-btn" type="button" data-mode="24">
+              <span class="m-title">Modo Pico</span>
+              <span class="m-sub">24m · 3 Mód</span>
+            </button>
+          </div>
+
+          <div class="sim-metrics-row">
+            <div class="sim-kpi">
+              <div class="sim-kpi-label">OCUPACIÓN</div>
+              <div class="sim-kpi-val" id="simOccPct">58%</div>
+            </div>
+            <div class="sim-kpi">
+              <div class="sim-kpi-label">PUESTOS LIBRES</div>
+              <div class="sim-kpi-val" id="simFreeSeats">18</div>
+            </div>
+            <div class="sim-kpi">
+              <div class="sim-kpi-label">AHORRO CO₂</div>
+              <div class="sim-kpi-val" id="simCo2Save">14%</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Mapa Interior de Puestos y Densidad por Vagón -->
+        <div class="tech-card">
+          <div class="section-header-row">
+            <h3 class="section-title" style="font-size:15px;">Mapa Cenital de Vagones</h3>
+            <span class="section-caption" id="interiorSummaryCaption">18 PUESTOS LIBRES</span>
+          </div>
+
+          <div style="background:var(--bg-canvas); border:1.5px solid var(--ink); border-radius:var(--radius-sm); padding:10px 8px;">
+            <svg id="interiorFloorplanSvg" viewBox="0 0 340 124" width="100%" height="124" aria-label="Mapa cenital de asientos libres y ocupados por módulo"></svg>
+            <div style="display:flex; justify-content:space-between; font-family:var(--font-mono); font-size:9.5px; margin-top:6px; color:var(--ink-secondary);">
+              <span style="display:flex; align-items:center; gap:4px;"><span style="width:9px; height:9px; background:var(--accent-lime); border:1px solid var(--ink); display:inline-block;"></span> Asiento libre</span>
+              <span style="display:flex; align-items:center; gap:4px;"><span style="width:9px; height:9px; background:var(--ink); display:inline-block;"></span> Ocupado</span>
+              <span style="display:flex; align-items:center; gap:4px;"><span style="width:9px; height:9px; background:var(--accent-orange); border:1px solid var(--ink); display:inline-block;"></span> Alta densidad</span>
+            </div>
+          </div>
+
+          <div class="boarding-callout is-optimal" id="boardingRecommendation">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
+            <span id="boardingRecText">Sube por la Puerta 3 (Trasera) — Zona despejada</span>
+          </div>
+        </div>
+
+        <!-- 3. Ficha de Telemetría del Vehículo -->
+        <div class="tech-card">
+          <div class="section-header-row">
+            <h3 class="section-title" style="font-size:15px;">Ficha de Telemetría</h3>
+            <span class="section-caption">SENSORES EN VIVO</span>
+          </div>
+          <div class="telemetry-grid" id="vehicleTelemetryGrid"></div>
+        </div>
+      </aside>
+
+      <!-- BOTTOM TAB BAR (DOCK INFERIOR) -->
+      <nav class="bottom-dock" aria-label="Navegación principal">
+        <button class="dock-tab is-active" type="button" data-tab="tabExplore">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+          <span>Rutas</span>
+        </button>
+        <button class="dock-tab" type="button" data-tab="tabPass">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><path d="M21 21v.01"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M3 12h.01"/><path d="M12 3h.01"/><path d="M12 16v.01"/><path d="M16 12h1"/><path d="M21 12v.01"/><path d="M12 21v-1"/></svg>
+          <span>Mi Pase QR</span>
+        </button>
+        <button class="dock-tab" type="button" data-tab="tabImpact">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+          <span>Impacto IoT</span>
+        </button>
+      </nav>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      /* ---------------- DATA MODEL: CARTAGENA CORRIDOR ---------------- */
+      const STATIONS = [
+        { id: 'prado', name: 'Portal El Prado', short: 'El Prado', km: 0.0, x: 30, y: 118, load: 74 },
+        { id: 'castellana', name: 'Estación La Castellana', short: 'Castellana', km: 2.4, x: 100, y: 118, load: 62 },
+        { id: 'bazurto', name: 'Bazurto', short: 'Bazurto', km: 5.1, x: 172, y: 96, load: 91 },
+        { id: 'bodeguita', name: 'Centro Histórico / Bodeguita', short: 'Bodeguita', km: 7.6, x: 244, y: 76, load: 82 },
+        { id: 'crespo', name: 'Crespo', short: 'Crespo', km: 10.2, x: 310, y: 36, load: 45 },
+        { id: 'bocagrande', name: 'Bocagrande', short: 'Bocagrande', km: 12.8, x: 348, y: 134, load: 68 }
+      ];
+
+      const ROUTE_POINTS_MAIN = [
+        { x: 30, y: 118 },
+        { x: 100, y: 118 },
+        { x: 172, y: 96 },
+        { x: 244, y: 76 },
+        { x: 310, y: 108 },
+        { x: 348, y: 134 }
+      ];
+
+      const ROUTE_POINTS_CRESPO = [
+        { x: 30, y: 118 },
+        { x: 100, y: 118 },
+        { x: 172, y: 96 },
+        { x: 244, y: 76 },
+        { x: 310, y: 36 },
+        { x: 348, y: 36 }
+      ];
+
+      const BUS_FLEET = [
+        {
+          id: 'UFX-104',
+          plate: 'CTG-892',
+          routeCode: 'T101',
+          routeLabel: 'Prado → Bocagrande',
+          branch: 'main',
+          mode: 24,
+          progress: 0.34,
+          dir: 1,
+          speed: 36,
+          temp: 21.4,
+          battery: 88,
+          passengers: 74,
+          railsStatus: 'SINCRONIZADO · 180 BAR',
+          stopsCovered: ['prado', 'castellana', 'bazurto', 'bodeguita', 'bocagrande'],
+          moduleLoads: { A: 0.78, B: 0.68, C: 0.25 }
+        },
+        {
+          id: 'UFX-208',
+          plate: 'CTG-415',
+          routeCode: 'T101',
+          routeLabel: 'Prado → Bocagrande',
+          branch: 'main',
+          mode: 18,
+          progress: 0.62,
+          dir: 1,
+          speed: 31,
+          temp: 22.0,
+          battery: 79,
+          passengers: 56,
+          railsStatus: 'SINCRONIZADO · 178 BAR',
+          stopsCovered: ['prado', 'castellana', 'bazurto', 'bodeguita', 'bocagrande'],
+          moduleLoads: { A: 0.74, B: 0.48, C: 0.20 }
+        },
+        {
+          id: 'UFX-312',
+          plate: 'CTG-901',
+          routeCode: 'T102',
+          routeLabel: 'Prado → Crespo',
+          branch: 'crespo',
+          mode: 12,
+          progress: 0.48,
+          dir: 1,
+          speed: 42,
+          temp: 20.8,
+          battery: 94,
+          passengers: 24,
+          railsStatus: 'RETRAÍDO · BLOQUEO ACTIVO',
+          stopsCovered: ['prado', 'castellana', 'bazurto', 'bodeguita', 'crespo'],
+          moduleLoads: { A: 0.56, B: 0.30, C: 0.15 }
+        },
+        {
+          id: 'UFX-119',
+          plate: 'CTG-530',
+          routeCode: 'T101',
+          routeLabel: 'Bocagrande → Prado',
+          branch: 'main',
+          mode: 24,
+          progress: 0.80,
+          dir: -1,
+          speed: 28,
+          temp: 22.3,
+          battery: 71,
+          passengers: 108,
+          railsStatus: 'SINCRONIZADO · 182 BAR',
+          stopsCovered: ['bocagrande', 'bodeguita', 'bazurto', 'castellana', 'prado'],
+          moduleLoads: { A: 0.92, B: 0.88, C: 0.72 }
+        },
+        {
+          id: 'UFX-405',
+          plate: 'CTG-774',
+          routeCode: 'E103',
+          routeLabel: 'Bazurto → Bocagrande',
+          branch: 'main',
+          mode: 18,
+          progress: 0.18,
+          dir: 1,
+          speed: 38,
+          temp: 21.1,
+          battery: 85,
+          passengers: 44,
+          railsStatus: 'SINCRONIZADO · 179 BAR',
+          stopsCovered: ['bazurto', 'bodeguita', 'bocagrande'],
+          moduleLoads: { A: 0.64, B: 0.36, C: 0.22 }
+        },
+        {
+          id: 'UFX-221',
+          plate: 'CTG-612',
+          routeCode: 'T102',
+          routeLabel: 'Crespo → Prado',
+          branch: 'crespo',
+          mode: 12,
+          progress: 0.74,
+          dir: -1,
+          speed: 40,
+          temp: 20.9,
+          battery: 91,
+          passengers: 19,
+          railsStatus: 'RETRAÍDO · BLOQUEO ACTIVO',
+          stopsCovered: ['crespo', 'bodeguita', 'bazurto', 'castellana', 'prado'],
+          moduleLoads: { A: 0.44, B: 0.25, C: 0.18 }
+        }
+      ];
+
+      const HOURLY_PROFILE = [
+        { hour: '05h', demand: 28, len: 12 },
+        { hour: '07h', demand: 88, len: 24 },
+        { hour: '09h', demand: 65, len: 18 },
+        { hour: '11h', demand: 36, len: 12 },
+        { hour: '13h', demand: 72, len: 18 },
+        { hour: '15h', demand: 42, len: 12 },
+        { hour: '17h', demand: 94, len: 24 },
+        { hour: '18h', demand: 96, len: 24 },
+        { hour: '20h', demand: 58, len: 18 },
+        { hour: '22h', demand: 24, len: 12 }
+      ];
+
+      const MODE_SPECS = {
+        12: { modules: 1, seatsTotal: 22, totalCap: 42, co2Bonus: 38, label: 'Modo Valle' },
+        18: { modules: 2, seatsTotal: 38, totalCap: 84, co2Bonus: 21, label: 'Modo Flujo' },
+        24: { modules: 3, seatsTotal: 54, totalCap: 128, co2Bonus: 14, label: 'Modo Pico' }
+      };
+
+      /* ---------------- STATE ---------------- */
+      const state = {
+        origin: '',
+        dest: '',
+        selectedBusId: null,
+        simMode: 24,
+        passBalance: 14500,
+        userTrips: 28,
+        userCo2: 42.8,
+        qrSeconds: 28,
+        qrSeed: 8841,
+        cityRegime: 'live',
+        selectedChartIdx: 7,
+        activities: [
+          { title: 'Validación · Estación Bazurto (UFX-104)', amount: '-$3.000', time: 'Hoy · 08:14', type: 'debit' },
+          { title: 'Recarga Digital Nequi', amount: '+$10.000', time: 'Ayer · 18:40', type: 'credit' },
+          { title: 'Validación · Portal El Prado (UFX-208)', amount: '-$3.000', time: 'Ayer · 07:52', type: 'debit' }
+        ]
+      };
+
+      /* ---------------- DOM REFERENCES ---------------- */
+      const splashScreen = document.getElementById('splashScreen');
+      const startAppBtn = document.getElementById('startAppBtn');
+      const liveClockMeta = document.getElementById('liveClockMeta');
+      const toastBanner = document.getElementById('toastBanner');
+      const toastText = document.getElementById('toastText');
+
+      const originSelect = document.getElementById('originSelect');
+      const destSelect = document.getElementById('destSelect');
+      const swapStationsBtn = document.getElementById('swapStationsBtn');
+      const routeSummaryStrip = document.getElementById('routeSummaryStrip');
+      const nearestFilterCaption = document.getElementById('nearestFilterCaption');
+      const busListContainer = document.getElementById('busListContainer');
+
+      const busDetailView = document.getElementById('busDetailView');
+      const closeDetailBtn = document.getElementById('closeDetailBtn');
+
+      /* ---------------- UTILITIES ---------------- */
+      function formatCOP(num) {
+        return '$' + num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+      }
+
+      let toastTimer = null;
+      function showToast(msg) {
+        toastText.textContent = msg;
+        toastBanner.classList.add('is-visible');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => {
+          toastBanner.classList.remove('is-visible');
+        }, 2400);
+      }
+
+      function updateClock() {
+        const now = new Date();
+        const hh = String(now.getHours()).padStart(2, '0');
+        const mm = String(now.getMinutes()).padStart(2, '0');
+        liveClockMeta.textContent = `CARTAGENA · ${hh}:${mm}`;
+      }
+
+      function getStation(id) {
+        return STATIONS.find(s => s.id === id) || STATIONS[0];
+      }
+
+      function interpolatePolyline(points, t) {
+        const clamped = Math.max(0, Math.min(1, t));
+        const segments = [];
+        let totalLen = 0;
+        for (let i = 0; i < points.length - 1; i++) {
+          const dx = points[i + 1].x - points[i].x;
+          const dy = points[i + 1].y - points[i].y;
+          const len = Math.hypot(dx, dy);
+          segments.push({ p1: points[i], p2: points[i + 1], len, angle: Math.atan2(dy, dx) * (180 / Math.PI) });
+          totalLen += len;
+        }
+        let target = clamped * totalLen;
+        for (const seg of segments) {
+          if (target <= seg.len || seg === segments[segments.length - 1]) {
+            const ratio = seg.len === 0 ? 0 : target / seg.len;
+            return {
+              x: seg.p1.x + (seg.p2.x - seg.p1.x) * ratio,
+              y: seg.p1.y + (seg.p2.y - seg.p1.y) * ratio,
+              angle: seg.angle
+            };
+          }
+          target -= seg.len;
+        }
+        return { x: points[0].x, y: points[0].y, angle: 0 };
+      }
+
+      /* ---------------- SPLASH PARALLAX INTERACTION ---------------- */
+      const splashMediaParallax = document.getElementById('splashMediaParallax');
+      splashScreen.addEventListener('pointermove', (e) => {
+        if (splashScreen.classList.contains('is-hidden')) return;
+        const rect = splashScreen.getBoundingClientRect();
+        const nx = ((e.clientX - rect.left) / rect.width - 0.5) * 14;
+        const ny = ((e.clientY - rect.top) / rect.height - 0.5) * 14;
+        splashMediaParallax.style.transform = `translate3d(${nx.toFixed(1)}px, ${ny.toFixed(1)}px, 0) scale(1.04)`;
+      });
+      splashScreen.addEventListener('pointerleave', () => {
+        splashMediaParallax.style.transform = '';
+      });
+
+      startAppBtn.addEventListener('click', () => {
+        splashScreen.classList.add('is-hidden');
+      });
+
+      /* ---------------- ROUTE PLANNER & BUS LIST ---------------- */
+      function populateStationSelects() {
+        originSelect.innerHTML = '<option value="">Selecciona origen...</option>';
+        destSelect.innerHTML = '<option value="">Selecciona destino...</option>';
+        STATIONS.forEach(st => {
+          const o1 = document.createElement('option');
+          o1.value = st.id;
+          o1.textContent = st.name;
+          originSelect.appendChild(o1);
+
+          const o2 = document.createElement('option');
+          o2.value = st.id;
+          o2.textContent = st.name;
+          destSelect.appendChild(o2);
+        });
+        originSelect.value = state.origin;
+        destSelect.value = state.dest;
+      }
+
+      function isRouteFiltered() {
+        return Boolean(state.origin && state.dest && state.origin !== state.dest);
+      }
+
+      function getFilteredFleet() {
+        if (!isRouteFiltered()) {
+          return BUS_FLEET;
+        }
+        return BUS_FLEET.filter(bus => {
+          const oIdx = bus.stopsCovered.indexOf(state.origin);
+          const dIdx = bus.stopsCovered.indexOf(state.dest);
+          return oIdx !== -1 && dIdx !== -1 && oIdx < dIdx;
+        });
+      }
+
+      function computeBusEta(bus) {
+        if (!state.origin) {
+          const stopIdx = Math.min(STATIONS.length - 1, Math.max(0, Math.round(bus.progress * (STATIONS.length - 1))));
+          const nearStop = STATIONS[stopIdx];
+          const meters = Math.max(140, Math.round((Math.abs((stopIdx / (STATIONS.length - 1)) - bus.progress) + 0.04) * 12800));
+          const minutes = Math.max(1, Math.round((meters / 1000) / (bus.speed / 60)));
+          return { meters, minutes, score: minutes, contextLabel: `Cerca de ${nearStop.short}` };
+        }
+        const originSt = getStation(state.origin);
+        const originFrac = Math.min(1, originSt.km / 12.8);
+        let distFrac = Math.abs(originFrac - bus.progress);
+        if (bus.dir === 1 && bus.progress > originFrac + 0.05) {
+          distFrac = (1 - bus.progress) + originFrac;
+        } else if (bus.dir === -1 && bus.progress < originFrac - 0.05) {
+          distFrac = bus.progress + (1 - originFrac);
+        }
+        const meters = Math.max(120, Math.round(distFrac * 12800));
+        const minutes = Math.max(1, Math.round((meters / 1000) / (bus.speed / 60)));
+        return { meters, minutes, score: minutes, contextLabel: `A ${meters}m de ${originSt.short}` };
+      }
+
+      function clearRouteFilter() {
+        state.origin = '';
+        state.dest = '';
+        originSelect.value = '';
+        destSelect.value = '';
+        renderRouteSummary();
+        renderRadarStations();
+        renderRadarBuses();
+        renderBusList();
+      }
+
+      function renderRouteSummary() {
+        const filtered = getFilteredFleet();
+        if (isRouteFiltered()) {
+          const o = getStation(state.origin);
+          const d = getStation(state.dest);
+          const distKm = Math.max(1.2, Math.abs(d.km - o.km)).toFixed(1);
+          const stopsCount = Math.max(2, Math.abs(STATIONS.indexOf(d) - STATIONS.indexOf(o)) + 1);
+          const estMin = Math.max(4, Math.round(Number(distKm) * 1.9));
+          routeSummaryStrip.innerHTML = `
+            <span>TRAMO: ${distKm} KM · ${stopsCount} PARADAS</span>
+            <span>ESTIMADO: ${estMin} MIN</span>
+          `;
+          nearestFilterCaption.textContent = `${o.short.toUpperCase()} → ${d.short.toUpperCase()} (${filtered.length})`;
+        } else if (state.origin && !state.dest) {
+          const o = getStation(state.origin);
+          routeSummaryStrip.innerHTML = `
+            <span>ORIGEN: ${o.short.toUpperCase()}</span>
+            <span>ELIGE DESTINO PARA FILTRAR</span>
+          `;
+          nearestFilterCaption.textContent = `TODAS (${filtered.length})`;
+        } else {
+          routeSummaryStrip.innerHTML = `
+            <span>TODAS LAS UNIDADES ACTIVAS</span>
+            <span>${filtered.length} EN CORREDOR</span>
+          `;
+          nearestFilterCaption.textContent = `TODAS (${filtered.length})`;
+        }
+
+        document.querySelectorAll('.preset-btn').forEach(btn => {
+          const match = btn.dataset.origin === state.origin && btn.dataset.dest === state.dest;
+          btn.classList.toggle('is-active', match);
+        });
+      }
+
+      function renderBusList() {
+        const filteredFleet = getFilteredFleet();
+        const enriched = filteredFleet.map(bus => {
+          const eta = computeBusEta(bus);
+          const spec = MODE_SPECS[bus.mode];
+          const occPct = Math.min(100, Math.round((bus.passengers / spec.totalCap) * 100));
+          const freeSeats = Math.max(0, Math.round(spec.seatsTotal * (1 - occPct / 100)));
+          return { bus, eta, spec, occPct, freeSeats };
+        }).sort((a, b) => a.eta.score - b.eta.score);
+
+        busListContainer.innerHTML = '';
+
+        if (enriched.length === 0) {
+          const o = getStation(state.origin);
+          const d = getStation(state.dest);
+          const emptyCard = document.createElement('div');
+          emptyCard.className = 'tech-card-muted';
+          emptyCard.style.cssText = 'text-align:center; padding:18px 14px;';
+          emptyCard.innerHTML = `
+            <div class="font-display" style="font-size:14px; font-weight:800; margin-bottom:6px;">Sin unidades directas en este tramo</div>
+            <p style="font-size:12px; color:var(--ink-secondary); margin-bottom:12px;">
+              No hay buses directos de ${o.short} hacia ${d.short} en este momento.
+            </p>
+            <button type="button" class="secondary-btn" id="clearEmptyFilterBtn">Ver todas las unidades</button>
+          `;
+          busListContainer.appendChild(emptyCard);
+          document.getElementById('clearEmptyFilterBtn').addEventListener('click', clearRouteFilter);
+          return;
+        }
+
+        enriched.forEach(({ bus, eta, spec, occPct, freeSeats }) => {
+          const isHighLoad = occPct >= 80;
+          const modeClass = isHighLoad ? 'mode-peak' : `mode-${bus.mode}`;
+          const barColor = isHighLoad ? 'var(--accent-orange)' : (bus.mode === 24 ? 'var(--accent-lime)' : 'var(--accent-cobalt)');
+
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'bus-item-btn';
+          btn.innerHTML = `
+            <div class="bus-item-top">
+              <div class="bus-id-group">
+                <span class="bus-code">${bus.id}</span>
+                <span class="bus-mode-tag ${modeClass}">${bus.mode}m · ${spec.modules} Mód</span>
+              </div>
+              <span class="bus-eta">${eta.minutes} min</span>
+            </div>
+            <div class="bus-route-line">
+              <span>${bus.routeCode} · ${bus.routeLabel}</span>
+              <span class="font-mono" style="font-size:11px; color:var(--ink-secondary);">${eta.contextLabel}</span>
+            </div>
+            <div class="occupancy-track">
+              <div class="occupancy-fill" style="width:${occPct}%; background:${barColor};"></div>
+            </div>
+            <div class="bus-meta-row">
+              <span>${freeSeats} puestos libres · Ocupación ${occPct}%</span>
+              <span style="color:var(--ink); font-weight:700;">Telemetría →</span>
+            </div>
+          `;
+          btn.addEventListener('click', () => openBusDetail(bus.id));
+          busListContainer.appendChild(btn);
+        });
+      }
+
+      originSelect.addEventListener('change', () => {
+        if (originSelect.value && originSelect.value === destSelect.value) {
+          destSelect.value = '';
+        }
+        state.origin = originSelect.value;
+        state.dest = destSelect.value;
+        renderRouteSummary();
+        renderRadarStations();
+        renderRadarBuses();
+        renderBusList();
+      });
+
+      destSelect.addEventListener('change', () => {
+        if (destSelect.value && destSelect.value === originSelect.value) {
+          originSelect.value = '';
+        }
+        state.origin = originSelect.value;
+        state.dest = destSelect.value;
+        renderRouteSummary();
+        renderRadarStations();
+        renderRadarBuses();
+        renderBusList();
+      });
+
+      swapStationsBtn.addEventListener('click', () => {
+        const tmp = state.origin;
+        state.origin = state.dest;
+        state.dest = tmp;
+        originSelect.value = state.origin;
+        destSelect.value = state.dest;
+        renderRouteSummary();
+        renderRadarStations();
+        renderRadarBuses();
+        renderBusList();
+      });
+
+      document.querySelectorAll('.preset-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          state.origin = btn.dataset.origin;
+          state.dest = btn.dataset.dest;
+          originSelect.value = state.origin;
+          destSelect.value = state.dest;
+          renderRouteSummary();
+          renderRadarStations();
+          renderRadarBuses();
+          renderBusList();
+        });
+      });
+
+      /* ---------------- SCHEMATIC RADAR MAP ---------------- */
+      function renderRadarStations() {
+        const layer = document.getElementById('radarStationsLayer');
+        layer.innerHTML = '';
+
+        STATIONS.forEach(st => {
+          const isOrigin = st.id === state.origin;
+          const isDest = st.id === state.dest;
+          const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+          g.style.cursor = 'pointer';
+
+          // Invisible generous tap target
+          const hit = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          hit.setAttribute('cx', st.x);
+          hit.setAttribute('cy', st.y);
+          hit.setAttribute('r', '18');
+          hit.setAttribute('fill', 'transparent');
+
+          const node = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          node.setAttribute('cx', st.x);
+          node.setAttribute('cy', st.y);
+          node.setAttribute('r', (isOrigin || isDest) ? '6.5' : '4.5');
+          node.setAttribute('fill', isOrigin ? '#B8FF00' : (isDest ? '#FF4D00' : '#FFFFFF'));
+          node.setAttribute('stroke', '#111315');
+          node.setAttribute('stroke-width', '2');
+
+          const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          const yOffset = st.id === 'crespo' ? -12 : (st.id === 'bodeguita' ? -12 : 18);
+          const anchor = st.id === 'prado' ? 'start' : (st.id === 'bocagrande' ? 'end' : 'middle');
+          label.setAttribute('x', st.x);
+          label.setAttribute('y', st.y + yOffset);
+          label.setAttribute('text-anchor', anchor);
+          label.setAttribute('font-family', 'JetBrains Mono, monospace');
+          label.setAttribute('font-size', (isOrigin || isDest) ? '9' : '8');
+          label.setAttribute('font-weight', (isOrigin || isDest) ? '700' : '600');
+          label.setAttribute('fill', '#111315');
+          label.textContent = st.short.toUpperCase();
+
+          g.appendChild(hit);
+          g.appendChild(node);
+          g.appendChild(label);
+
+          g.addEventListener('click', () => {
+            if (!state.origin) {
+              state.origin = st.id;
+              originSelect.value = st.id;
+              renderRouteSummary();
+              renderRadarStations();
+              renderRadarBuses();
+              renderBusList();
+              showToast(`Origen seleccionado: ${st.name}`);
+            } else if (st.id !== state.origin) {
+              state.dest = st.id;
+              destSelect.value = st.id;
+              renderRouteSummary();
+              renderRadarStations();
+              renderRadarBuses();
+              renderBusList();
+              showToast(`Ruta filtrada hacia ${st.short}`);
+            }
+          });
+
+          layer.appendChild(g);
+        });
+      }
+
+      function renderRadarBuses() {
+        const layer = document.getElementById('radarBusesLayer');
+        layer.innerHTML = '';
+        const visibleBuses = getFilteredFleet();
+        const countLabel = document.getElementById('radarActiveCount');
+        if (countLabel) {
+          countLabel.textContent = visibleBuses.length === 1
+            ? '1 UNIDAD EN RUTA'
+            : `${visibleBuses.length} UNIDADES EN RUTA`;
+        }
+
+        visibleBuses.forEach(bus => {
+          const pts = bus.branch === 'crespo' ? ROUTE_POINTS_CRESPO : ROUTE_POINTS_MAIN;
+          const pos = interpolatePolyline(pts, bus.progress);
+          const spec = MODE_SPECS[bus.mode];
+          const occPct = Math.round((bus.passengers / spec.totalCap) * 100);
+          const isHigh = occPct >= 80;
+          const fill = isHigh ? '#FF4D00' : (bus.mode === 24 ? '#B8FF00' : (bus.mode === 18 ? '#0047FF' : '#EAEAE4'));
+          const width = bus.mode === 24 ? 22 : (bus.mode === 18 ? 16 : 11);
+
+          const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+          g.style.cursor = 'pointer';
+          g.setAttribute('transform', `translate(${pos.x.toFixed(1)}, ${pos.y.toFixed(1)})`);
+
+          // Hit area
+          const hit = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          hit.setAttribute('r', '18');
+          hit.setAttribute('fill', 'transparent');
+
+          const body = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          body.setAttribute('x', -width / 2);
+          body.setAttribute('y', -5.5);
+          body.setAttribute('width', width);
+          body.setAttribute('height', 11);
+          body.setAttribute('rx', '2.5');
+          body.setAttribute('fill', fill);
+          body.setAttribute('stroke', '#111315');
+          body.setAttribute('stroke-width', '1.6');
+          body.setAttribute('transform', `rotate(${pos.angle.toFixed(1)})`);
+
+          // Module divider ticks on bus icon
+          if (bus.mode >= 18) {
+            const div1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            div1.setAttribute('x1', bus.mode === 24 ? -3 : 0);
+            div1.setAttribute('y1', -5);
+            div1.setAttribute('x2', bus.mode === 24 ? -3 : 0);
+            div1.setAttribute('y2', 5);
+            div1.setAttribute('stroke', '#111315');
+            div1.setAttribute('stroke-width', '1.2');
+            div1.setAttribute('transform', `rotate(${pos.angle.toFixed(1)})`);
+            g.appendChild(body);
+            g.appendChild(div1);
+            if (bus.mode === 24) {
+              const div2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+              div2.setAttribute('x1', 4);
+              div2.setAttribute('y1', -5);
+              div2.setAttribute('x2', 4);
+              div2.setAttribute('y2', 5);
+              div2.setAttribute('stroke', '#111315');
+              div2.setAttribute('stroke-width', '1.2');
+              div2.setAttribute('transform', `rotate(${pos.angle.toFixed(1)})`);
+              g.appendChild(div2);
+            }
+          } else {
+            g.appendChild(body);
+          }
+
+          const tag = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          tag.setAttribute('y', '-10');
+          tag.setAttribute('text-anchor', 'middle');
+          tag.setAttribute('font-family', 'JetBrains Mono, monospace');
+          tag.setAttribute('font-size', '7.5');
+          tag.setAttribute('font-weight', '700');
+          tag.setAttribute('fill', '#111315');
+          tag.textContent = bus.id.replace('UFX-', '');
+
+          g.appendChild(hit);
+          g.appendChild(tag);
+          g.addEventListener('click', () => openBusDetail(bus.id));
+          layer.appendChild(g);
+        });
+      }
+
+      /* ---------------- BUS DETAIL VIEW & MECHANICAL SIMULATOR ---------------- */
+      function openBusDetail(busId) {
+        const bus = BUS_FLEET.find(b => b.id === busId);
+        if (!bus) return;
+        state.selectedBusId = busId;
+        state.simMode = bus.mode;
+        renderBusDetail();
+        busDetailView.classList.add('is-open');
+        busDetailView.scrollTop = 0;
+      }
+
+      closeDetailBtn.addEventListener('click', () => {
+        busDetailView.classList.remove('is-open');
+        state.selectedBusId = null;
+      });
+
+      document.querySelectorAll('.mode-switch-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          state.simMode = Number(btn.dataset.mode);
+          renderBusDetail();
+        });
+      });
+
+      function renderBusDetail() {
+        const bus = BUS_FLEET.find(b => b.id === state.selectedBusId);
+        if (!bus) return;
+        const spec = MODE_SPECS[state.simMode];
+
+        document.getElementById('detailUnitBadge').textContent = `${bus.id} · ${bus.plate}`;
+        document.getElementById('simRailStatus').textContent = state.simMode === bus.mode ? 'RIELES: SINCRONIZADO' : 'SIMULACIÓN ACTIVA';
+
+        // Highlight mode buttons
+        document.querySelectorAll('.mode-switch-btn').forEach(btn => {
+          btn.classList.toggle('is-active', Number(btn.dataset.mode) === state.simMode);
+        });
+
+        // Animate Mechanical Diagram
+        const modB = document.getElementById('simModB');
+        const modC = document.getElementById('simModC');
+        const acc1 = document.getElementById('simAcc1');
+        const acc2 = document.getElementById('simAcc2');
+        const dimLine = document.getElementById('simDimLine');
+        const dimTick = document.getElementById('simDimEndTick');
+        const dimLabel = document.getElementById('simDimLabel');
+
+        if (state.simMode === 12) {
+          modB.setAttribute('transform', 'translate(22, 0)');
+          modB.style.opacity = '0';
+          acc1.setAttribute('transform', 'translate(34, 0)');
+          acc1.style.opacity = '0';
+          modC.setAttribute('transform', 'translate(22, 0)');
+          modC.style.opacity = '0';
+          acc2.setAttribute('transform', 'translate(34, 0)');
+          acc2.style.opacity = '0';
+          dimLine.setAttribute('x2', '104');
+          dimTick.setAttribute('x1', '104');
+          dimTick.setAttribute('x2', '104');
+          dimLabel.textContent = '12.0 m';
+        } else if (state.simMode === 18) {
+          modB.setAttribute('transform', 'translate(118, 0)');
+          modB.style.opacity = '1';
+          acc1.setAttribute('transform', 'translate(102, 0)');
+          acc1.style.opacity = '1';
+          modC.setAttribute('transform', 'translate(118, 0)');
+          modC.style.opacity = '0';
+          acc2.setAttribute('transform', 'translate(118, 0)');
+          acc2.style.opacity = '0';
+          dimLine.setAttribute('x2', '198');
+          dimTick.setAttribute('x1', '198');
+          dimTick.setAttribute('x2', '198');
+          dimLabel.textContent = '18.0 m';
+        } else {
+          modB.setAttribute('transform', 'translate(118, 0)');
+          modB.style.opacity = '1';
+          acc1.setAttribute('transform', 'translate(102, 0)');
+          acc1.style.opacity = '1';
+          modC.setAttribute('transform', 'translate(212, 0)');
+          modC.style.opacity = '1';
+          acc2.setAttribute('transform', 'translate(196, 0)');
+          acc2.style.opacity = '1';
+          dimLine.setAttribute('x2', '306');
+          dimTick.setAttribute('x1', '306');
+          dimTick.setAttribute('x2', '306');
+          dimLabel.textContent = '24.0 m';
+        }
+
+        // Recalculate Capacity, Occupancy & Seats
+        const rawOcc = Math.round((bus.passengers / spec.totalCap) * 100);
+        const occPct = Math.min(135, rawOcc);
+        const isOver = rawOcc > 100;
+        const clampedOcc = Math.min(100, rawOcc);
+        const freeSeats = isOver ? 0 : Math.max(0, Math.round(spec.seatsTotal * (1 - clampedOcc / 100)));
+
+        const occEl = document.getElementById('simOccPct');
+        occEl.textContent = isOver ? `${rawOcc}% (!)` : `${rawOcc}%`;
+        occEl.style.color = isOver ? '#C23800' : 'var(--ink)';
+        document.getElementById('simFreeSeats').textContent = freeSeats;
+        document.getElementById('simCo2Save').textContent = `+${spec.co2Bonus}%`;
+
+        // Render Interior Top-Down Floorplan
+        renderInteriorFloorplan(bus, state.simMode, rawOcc, freeSeats);
+
+        // Render Vehicle Telemetry Grid
+        const nextStopIdx = Math.min(STATIONS.length - 1, Math.max(0, Math.round(bus.progress * (STATIONS.length - 1))));
+        const nextStop = STATIONS[nextStopIdx];
+        const telemGrid = document.getElementById('vehicleTelemetryGrid');
+        telemGrid.innerHTML = `
+          <div class="telem-cell">
+            <div class="telem-key">UNIDAD / PLACA</div>
+            <div class="telem-val">${bus.id} · ${bus.plate}</div>
+          </div>
+          <div class="telem-cell">
+            <div class="telem-key">VELOCIDAD ACTUAL</div>
+            <div class="telem-val">${bus.speed} km/h</div>
+          </div>
+          <div class="telem-cell">
+            <div class="telem-key">CLIMA INTERIOR</div>
+            <div class="telem-val">${bus.temp.toFixed(1)} °C · A/C</div>
+          </div>
+          <div class="telem-cell">
+            <div class="telem-key">PRÓXIMA ESTACIÓN</div>
+            <div class="telem-val">${nextStop.short} · 1 min</div>
+          </div>
+          <div class="telem-cell">
+            <div class="telem-key">RIELES HIDRÁULICOS</div>
+            <div class="telem-val" style="color:var(--accent-cobalt);">${bus.railsStatus.split('·')[0]}</div>
+          </div>
+          <div class="telem-cell">
+            <div class="telem-key">BATERÍA / REGEN</div>
+            <div class="telem-val">${bus.battery}% · ACTIVA</div>
+          </div>
+        `;
+      }
+
+      function renderInteriorFloorplan(bus, mode, rawOcc, freeSeats) {
+        const svg = document.getElementById('interiorFloorplanSvg');
+        svg.innerHTML = '';
+
+        const activeModules = mode === 12 ? ['A'] : (mode === 18 ? ['A', 'B'] : ['A', 'B', 'C']);
+        const moduleConfig = {
+          A: { x: 10, w: 100, doorLabel: 'P1', doorX: 28, cols: 4 },
+          B: { x: 120, w: 96, doorLabel: 'P2', doorX: 162, cols: 4 },
+          C: { x: 226, w: 104, doorLabel: 'P3', doorX: 286, cols: 4 }
+        };
+
+        // Rebalance module loads realistically when compressed
+        const scaleFactor = bus.mode / mode;
+        const loads = {};
+        activeModules.forEach(m => {
+          loads[m] = Math.min(0.98, Math.max(0.18, bus.moduleLoads[m] * scaleFactor));
+        });
+
+        let bestMod = activeModules[0];
+        activeModules.forEach(m => {
+          if (loads[m] < loads[bestMod]) bestMod = m;
+        });
+
+        activeModules.forEach((m, idx) => {
+          const cfg = moduleConfig[m];
+          const load = loads[m];
+          const isCrowded = load >= 0.78;
+
+          // Module hull
+          const hull = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          hull.setAttribute('x', cfg.x);
+          hull.setAttribute('y', 18);
+          hull.setAttribute('width', cfg.w);
+          hull.setAttribute('height', 76);
+          hull.setAttribute('rx', '6');
+          hull.setAttribute('fill', '#FFFFFF');
+          hull.setAttribute('stroke', '#111315');
+          hull.setAttribute('stroke-width', '1.8');
+          svg.appendChild(hull);
+
+          // Aisle density band
+          const aisle = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          aisle.setAttribute('x', cfg.x + 8);
+          aisle.setAttribute('y', 48);
+          aisle.setAttribute('width', cfg.w - 16);
+          aisle.setAttribute('height', 16);
+          aisle.setAttribute('rx', '3');
+          aisle.setAttribute('fill', isCrowded ? 'rgba(255, 77, 0, 0.25)' : 'rgba(184, 255, 0, 0.22)');
+          svg.appendChild(aisle);
+
+          // Module header label
+          const lbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          lbl.setAttribute('x', cfg.x + cfg.w / 2);
+          lbl.setAttribute('y', 12);
+          lbl.setAttribute('text-anchor', 'middle');
+          lbl.setAttribute('font-family', 'JetBrains Mono, monospace');
+          lbl.setAttribute('font-size', '9');
+          lbl.setAttribute('font-weight', '700');
+          lbl.setAttribute('fill', '#111315');
+          lbl.textContent = `MÓD ${m} · ${Math.round(load * 100)}%`;
+          svg.appendChild(lbl);
+
+          // Seats (Top and Bottom rows)
+          const totalSeatsInMod = cfg.cols * 2;
+          const occupiedSeats = Math.round(totalSeatsInMod * load);
+          let seatIdx = 0;
+          for (let c = 0; c < cfg.cols; c++) {
+            const sx = cfg.x + 14 + c * 20;
+            [24, 72].forEach(sy => {
+              const isOcc = seatIdx < occupiedSeats;
+              const seat = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+              seat.setAttribute('x', sx);
+              seat.setAttribute('y', sy);
+              seat.setAttribute('width', 13);
+              seat.setAttribute('height', 14);
+              seat.setAttribute('rx', '2.5');
+              seat.setAttribute('fill', isOcc ? (isCrowded ? '#FF4D00' : '#111315') : '#B8FF00');
+              seat.setAttribute('stroke', '#111315');
+              seat.setAttribute('stroke-width', '1.2');
+              svg.appendChild(seat);
+              seatIdx++;
+            });
+          }
+
+          // Door indicator at bottom
+          const doorRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          doorRect.setAttribute('x', cfg.doorX - 10);
+          doorRect.setAttribute('y', 91);
+          doorRect.setAttribute('width', 20);
+          doorRect.setAttribute('height', 6);
+          doorRect.setAttribute('fill', m === bestMod ? '#B8FF00' : '#0047FF');
+          doorRect.setAttribute('stroke', '#111315');
+          doorRect.setAttribute('stroke-width', '1');
+          svg.appendChild(doorRect);
+
+          const doorTxt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          doorTxt.setAttribute('x', cfg.doorX);
+          doorTxt.setAttribute('y', 110);
+          doorTxt.setAttribute('text-anchor', 'middle');
+          doorTxt.setAttribute('font-family', 'JetBrains Mono, monospace');
+          doorTxt.setAttribute('font-size', '8.5');
+          doorTxt.setAttribute('font-weight', '700');
+          doorTxt.setAttribute('fill', '#111315');
+          doorTxt.textContent = cfg.doorLabel;
+          svg.appendChild(doorTxt);
+
+          // Accordion connector to next module
+          if (idx < activeModules.length - 1) {
+            const conn = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            conn.setAttribute('x', cfg.x + cfg.w);
+            conn.setAttribute('y', 28);
+            conn.setAttribute('width', 10);
+            conn.setAttribute('height', 56);
+            conn.setAttribute('fill', '#111315');
+            svg.appendChild(conn);
+          }
+        });
+
+        // Smart Boarding Recommendation
+        const recBox = document.getElementById('boardingRecommendation');
+        const recText = document.getElementById('boardingRecText');
+        const capText = document.getElementById('interiorSummaryCaption');
+        const bestPct = Math.round(loads[bestMod] * 100);
+        const doorDesc = bestMod === 'A' ? 'Puerta 1 (Delantera)' : (bestMod === 'B' ? 'Puerta 2 (Central)' : 'Puerta 3 (Trasera)');
+
+        capText.textContent = `${freeSeats} PUESTOS LIBRES · MÓD ${bestMod} AL ${bestPct}%`;
+
+        if (rawOcc > 100) {
+          recBox.className = 'boarding-callout is-alert';
+          recText.textContent = `Capacidad excedida en modo ${mode}m (${rawOcc}%). Activa expansión a 18m o 24m para descongestionar.`;
+        } else {
+          recBox.className = 'boarding-callout is-optimal';
+          recText.textContent = `Sube por la ${doorDesc} — Zona despejada (${bestPct}% de carga).`;
+        }
+      }
+
+      /* ---------------- TAB 2: MI PASE QR ---------------- */
+      function renderQrMatrix(seed) {
+        const svg = document.getElementById('dynamicQrSvg');
+        svg.innerHTML = '';
+        const size = 12;
+        const cell = 10;
+
+        // Corner finder patterns
+        const finders = [[0, 0], [8, 0], [0, 8]];
+        const isFinder = (r, c) => finders.some(([fr, fc]) => r >= fr && r < fr + 4 && c >= fc && c < fc + 4);
+
+        for (let r = 0; r < size; r++) {
+          for (let c = 0; c < size; c++) {
+            let filled = false;
+            if (isFinder(r, c)) {
+              const lr = r % 8;
+              const lc = c % 8;
+              filled = (lr === 0 || lr === 3 || lc === 0 || lc === 3 || (lr >= 1 && lr <= 2 && lc >= 1 && lc <= 2));
+            } else {
+              const hash = Math.abs(Math.sin((r * 31 + c * 17 + seed) * 12.9898) * 43758.5453);
+              filled = (hash - Math.floor(hash)) > 0.46;
+            }
+            if (filled) {
+              const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+              rect.setAttribute('x', c * cell);
+              rect.setAttribute('y', r * cell);
+              rect.setAttribute('width', cell - 0.8);
+              rect.setAttribute('height', cell - 0.8);
+              rect.setAttribute('fill', '#111315');
+              svg.appendChild(rect);
+            }
+          }
+        }
+        document.getElementById('qrTokenCode').textContent = `UFX-KEY-${seed}`;
+      }
+
+      function renderPassPanel() {
+        document.getElementById('passBalanceText').textContent = formatCOP(state.passBalance);
+        document.getElementById('userTripCountLabel').textContent = `${state.userTrips} VIAJES`;
+        document.getElementById('userCo2Saved').textContent = `${state.userCo2.toFixed(1)} kg CO₂`;
+
+        const list = document.getElementById('passActivityList');
+        list.innerHTML = '';
+        state.activities.slice(0, 4).forEach(act => {
+          const row = document.createElement('div');
+          row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding-bottom:8px; border-bottom:1px solid rgba(17,19,21,0.12);';
+          row.innerHTML = `
+            <div>
+              <div style="font-size:12.5px; font-weight:600;">${act.title}</div>
+              <div class="font-mono" style="font-size:10px; color:var(--ink-secondary);">${act.time}</div>
+            </div>
+            <div class="font-mono" style="font-size:12.5px; font-weight:700; color:${act.type === 'credit' ? 'var(--accent-cobalt)' : 'var(--ink)'};">${act.amount}</div>
+          `;
+          list.appendChild(row);
+        });
+      }
+
+      document.getElementById('refreshQrBtn').addEventListener('click', () => {
+        state.qrSeed = Math.floor(1000 + Math.random() * 8999);
+        state.qrSeconds = 30;
+        renderQrMatrix(state.qrSeed);
+        showToast('Código QR de seguridad actualizado');
+      });
+
+      document.getElementById('validateFareBtn').addEventListener('click', () => {
+        if (state.passBalance < 3000) {
+          showToast('Saldo insuficiente. Realiza una recarga rápida.');
+          return;
+        }
+        state.passBalance -= 3000;
+        state.userTrips += 1;
+        state.userCo2 += 1.5;
+        const st = getStation(state.origin);
+        state.activities.unshift({
+          title: `Validación · ${st.short} (Pase QR)`,
+          amount: '-$3.000',
+          time: 'Ahora mismo',
+          type: 'debit'
+        });
+        renderPassPanel();
+        showToast(`Acceso autorizado en ${st.short} · -$3.000 COP`);
+      });
+
+      document.querySelectorAll('.topup-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const amt = Number(btn.dataset.amount);
+          state.passBalance += amt;
+          state.activities.unshift({
+            title: 'Recarga Instantánea Digital',
+            amount: `+${formatCOP(amt)}`,
+            time: 'Ahora mismo',
+            type: 'credit'
+          });
+          renderPassPanel();
+          showToast(`Recarga exitosa: +${formatCOP(amt)} COP`);
+        });
+      });
+
+      /* ---------------- TAB 3: IMPACTO IOT ---------------- */
+      const REGIME_DATA = {
+        live: { m12: 5, m18: 5, m24: 4, co2: '1.84 Ton', wait: '3.2 min', eff: '+31.4%', occ: '64%', cap: '1.142 PAX', sub: 'Ahorro activo en valle' },
+        valle: { m12: 10, m18: 3, m24: 1, co2: '2.46 Ton', wait: '4.1 min', eff: '+42.8%', occ: '41%', cap: '800 PAX', sub: 'Máxima retracción energética' },
+        pico: { m12: 1, m18: 3, m24: 10, co2: '1.38 Ton', wait: '2.1 min', eff: '+22.0%', occ: '86%', cap: '1.574 PAX', sub: 'Despliegue total 24 metros' }
+      };
+
+      function renderImpactDashboard() {
+        const d = REGIME_DATA[state.cityRegime];
+        const total = 14;
+        document.getElementById('kpiRetracted').textContent = `${d.m12} / ${total}`;
+        document.getElementById('kpiRetractedSub').textContent = d.sub;
+        document.getElementById('kpiCo2City').textContent = d.co2;
+        document.getElementById('kpiWaitTime').textContent = d.wait;
+        document.getElementById('kpiEfficiency').textContent = d.eff;
+        document.getElementById('deployedCapText').textContent = d.cap;
+        document.getElementById('avgOccText').textContent = d.occ;
+
+        const w12 = Math.round((d.m12 / total) * 100);
+        const w18 = Math.round((d.m18 / total) * 100);
+        const w24 = 100 - w12 - w18;
+
+        const seg12 = document.getElementById('mixSeg12');
+        const seg18 = document.getElementById('mixSeg18');
+        const seg24 = document.getElementById('mixSeg24');
+        seg12.style.width = `${w12}%`;
+        seg12.textContent = d.m12 > 1 ? `12m (${d.m12})` : '';
+        seg18.style.width = `${w18}%`;
+        seg18.textContent = d.m18 > 1 ? `18m (${d.m18})` : '';
+        seg24.style.width = `${w24}%`;
+        seg24.textContent = d.m24 > 1 ? `24m (${d.m24})` : '';
+
+        renderDemandChart();
+        renderStationLoadList();
+      }
+
+      function renderDemandChart() {
+        const svg = document.getElementById('cityDemandChart');
+        svg.innerHTML = '';
+
+        HOURLY_PROFILE.forEach((pt, idx) => {
+          const x = 14 + idx * 32;
+          const barH = Math.round((pt.demand / 100) * 86);
+          const y = 100 - barH;
+          const isSel = idx === state.selectedChartIdx;
+          const fill = pt.len === 24 ? (pt.demand > 85 ? '#FF4D00' : '#B8FF00') : (pt.len === 18 ? '#0047FF' : '#EAEAE4');
+
+          const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+          g.style.cursor = 'pointer';
+
+          const bar = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          bar.setAttribute('x', x);
+          bar.setAttribute('y', y);
+          bar.setAttribute('width', 20);
+          bar.setAttribute('height', barH);
+          bar.setAttribute('rx', '3');
+          bar.setAttribute('fill', fill);
+          bar.setAttribute('stroke', '#111315');
+          bar.setAttribute('stroke-width', isSel ? '2.2' : '1.2');
+
+          const hr = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          hr.setAttribute('x', x + 10);
+          hr.setAttribute('y', 116);
+          hr.setAttribute('text-anchor', 'middle');
+          hr.setAttribute('font-family', 'JetBrains Mono, monospace');
+          hr.setAttribute('font-size', '8.5');
+          hr.setAttribute('font-weight', isSel ? '700' : '500');
+          hr.setAttribute('fill', '#111315');
+          hr.textContent = pt.hour;
+
+          g.appendChild(bar);
+          g.appendChild(hr);
+          g.addEventListener('click', () => {
+            state.selectedChartIdx = idx;
+            renderDemandChart();
+          });
+          svg.appendChild(g);
+        });
+
+        const cur = HOURLY_PROFILE[state.selectedChartIdx];
+        document.getElementById('chartSelectedReadout').innerHTML = `
+          <span>FRANJA ${cur.hour.toUpperCase()} · DEMANDA ${cur.demand}%</span>
+          <span style="color:var(--ink); font-weight:700;">FLOTA EN ${cur.len}M</span>
+        `;
+      }
+
+      function renderStationLoadList() {
+        const container = document.getElementById('stationLoadList');
+        container.innerHTML = '';
+        const mult = state.cityRegime === 'pico' ? 1.15 : (state.cityRegime === 'valle' ? 0.55 : 1.0);
+        STATIONS.forEach(st => {
+          const val = Math.min(98, Math.round(st.load * mult));
+          const color = val >= 80 ? 'var(--accent-orange)' : (val >= 60 ? 'var(--accent-cobalt)' : 'var(--accent-lime)');
+          const row = document.createElement('div');
+          row.innerHTML = `
+            <div style="display:flex; justify-content:space-between; font-size:12px; font-weight:600; margin-bottom:4px;">
+              <span>${st.name}</span>
+              <span class="font-mono" style="font-size:11px;">${val}%</span>
+            </div>
+            <div class="occupancy-track">
+              <div class="occupancy-fill" style="width:${val}%; background:${color};"></div>
+            </div>
+          `;
+          container.appendChild(row);
+        });
+      }
+
+      document.querySelectorAll('.regime-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          state.cityRegime = btn.dataset.regime;
+          document.querySelectorAll('.regime-btn').forEach(b => b.classList.toggle('is-active', b === btn));
+          renderImpactDashboard();
+        });
+      });
+
+      /* ---------------- BOTTOM DOCK NAVIGATION ---------------- */
+      document.querySelectorAll('.dock-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          const targetId = tab.dataset.tab;
+          document.querySelectorAll('.dock-tab').forEach(t => t.classList.toggle('is-active', t === tab));
+          document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('is-active', p.id === targetId));
+          busDetailView.classList.remove('is-open');
+          state.selectedBusId = null;
+        });
+      });
+
+      /* ---------------- LIVE SIMULATION LOOP ---------------- */
+      function tickTelemetry() {
+        BUS_FLEET.forEach(bus => {
+          const step = (bus.speed / 3600) * 1.45;
+          bus.progress += bus.dir * step;
+          if (bus.progress >= 0.96) {
+            bus.progress = 0.96;
+            bus.dir = -1;
+          } else if (bus.progress <= 0.04) {
+            bus.progress = 0.04;
+            bus.dir = 1;
+          }
+          // Subtle speed variation
+          bus.speed = Math.max(22, Math.min(46, bus.speed + (Math.random() > 0.5 ? 1 : -1)));
+        });
+
+        renderRadarBuses();
+        if (!state.selectedBusId) {
+          renderBusList();
+        }
+      }
+
+      function tickQrCountdown() {
+        state.qrSeconds -= 1;
+        if (state.qrSeconds <= 0) {
+          state.qrSeconds = 30;
+          state.qrSeed = Math.floor(1000 + Math.random() * 8999);
+          renderQrMatrix(state.qrSeed);
+        }
+        document.getElementById('qrCountdown').textContent = `EXPIRA EN ${state.qrSeconds}S`;
+      }
+
+      /* ---------------- INITIALIZATION ---------------- */
+      populateStationSelects();
+      renderRouteSummary();
+      renderRadarStations();
+      renderRadarBuses();
+      renderBusList();
+      renderQrMatrix(state.qrSeed);
+      renderPassPanel();
+      renderImpactDashboard();
+      updateClock();
+
+      /* ---------------- INTERACTIVE OUTER GRAY GRID ---------------- */
+      (function initOuterInteractiveGrid() {
+        const canvas = document.getElementById('outerGridCanvas');
+        const deviceShell = document.getElementById('deviceShell');
+        if (!canvas || !deviceShell) return;
+
+        const ctx = canvas.getContext('2d');
+        const CELL_SIZE = 34;
+        const paintedCells = new Map();
+        let rafId = null;
+        let lastPos = null;
+        let width = 0;
+        let height = 0;
+        let dpr = 1;
+
+        function resizeCanvas() {
+          dpr = Math.min(window.devicePixelRatio || 1, 2);
+          width = window.innerWidth;
+          height = window.innerHeight;
+          canvas.width = Math.floor(width * dpr);
+          canvas.height = Math.floor(height * dpr);
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          drawGrid();
+        }
+
+        function drawGrid() {
+          ctx.clearRect(0, 0, width, height);
+
+          // Stronger saturated gray base background
+          ctx.fillStyle = '#D2D2CA';
+          ctx.fillRect(0, 0, width, height);
+
+          // Paint darkened cells touched by the mouse
+          for (const [key, cell] of paintedCells.entries()) {
+            if (cell.alpha <= 0.01) continue;
+            const [col, row] = key.split(',').map(Number);
+            ctx.fillStyle = `rgba(17, 19, 21, ${(cell.alpha * 0.88).toFixed(3)})`;
+            ctx.fillRect(col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+          }
+
+          // Bold saturated gray grid lines
+          ctx.strokeStyle = 'rgba(17, 19, 21, 0.34)';
+          ctx.lineWidth = 1.35;
+          ctx.beginPath();
+          for (let x = 0; x <= width; x += CELL_SIZE) {
+            ctx.moveTo(x + 0.5, 0);
+            ctx.lineTo(x + 0.5, height);
+          }
+          for (let y = 0; y <= height; y += CELL_SIZE) {
+            ctx.moveTo(0, y + 0.5);
+            ctx.lineTo(width, y + 0.5);
+          }
+          ctx.stroke();
+        }
+
+        function scheduleRender() {
+          if (rafId !== null) return;
+          rafId = requestAnimationFrame(stepAnimation);
+        }
+
+        function stepAnimation() {
+          let needsMore = false;
+          for (const [key, cell] of paintedCells.entries()) {
+            const diff = cell.target - cell.alpha;
+            if (Math.abs(diff) < 0.015) {
+              cell.alpha = cell.target;
+              if (cell.target === 0) {
+                paintedCells.delete(key);
+              }
+            } else {
+              cell.alpha += diff * 0.24;
+              needsMore = true;
+            }
+          }
+          drawGrid();
+          if (needsMore) {
+            rafId = requestAnimationFrame(stepAnimation);
+          } else {
+            rafId = null;
+          }
+        }
+
+        function paintCellAt(x, y) {
+          const col = Math.floor(x / CELL_SIZE);
+          const row = Math.floor(y / CELL_SIZE);
+          const key = `${col},${row}`;
+          const existing = paintedCells.get(key);
+          if (existing) {
+            existing.target = 1;
+            existing.alpha = Math.max(existing.alpha, 0.45);
+          } else {
+            paintedCells.set(key, { alpha: 0.45, target: 1 });
+          }
+        }
+
+        function resetOuterGrid() {
+          lastPos = null;
+          if (paintedCells.size === 0) return;
+          for (const cell of paintedCells.values()) {
+            cell.target = 0;
+          }
+          scheduleRender();
+        }
+
+        function isInsideDevice(x, y) {
+          const rect = deviceShell.getBoundingClientRect();
+          return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+        }
+
+        document.addEventListener('pointermove', (e) => {
+          if (e.pointerType === 'touch') return;
+          const x = e.clientX;
+          const y = e.clientY;
+
+          if (isInsideDevice(x, y)) {
+            resetOuterGrid();
+            return;
+          }
+
+          if (lastPos) {
+            const dx = x - lastPos.x;
+            const dy = y - lastPos.y;
+            const dist = Math.hypot(dx, dy);
+            const steps = Math.max(1, Math.ceil(dist / 10));
+            for (let i = 1; i <= steps; i++) {
+              const t = i / steps;
+              paintCellAt(lastPos.x + dx * t, lastPos.y + dy * t);
+            }
+          } else {
+            paintCellAt(x, y);
+          }
+
+          lastPos = { x, y };
+          scheduleRender();
+        });
+
+        deviceShell.addEventListener('pointerenter', resetOuterGrid);
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+      })();
+
+      setInterval(tickTelemetry, 1800);
+      setInterval(tickQrCountdown, 1000);
+      setInterval(updateClock, 15000);
+    })();
+  </script>
+</body>
+</html>

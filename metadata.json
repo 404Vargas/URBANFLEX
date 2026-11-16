@@ -1,0 +1,6 @@
+{
+  "name": "UrbanFlex Cartagena",
+  "description": "Aplicación móvil interactiva de movilidad inteligente y telemetría IoT para el sistema de buses modulares UrbanFlex en Cartagena, Colombia.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
